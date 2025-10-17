@@ -1,8 +1,9 @@
 /* eslint-disable @next/next/no-img-element */
+// Update: components/chat/chat-area.tsx - Key additions for reply feature
+
 'use client';
 
 import type React from 'react';
-
 import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,12 +18,15 @@ import {
   FileIcon,
   Download,
 } from 'lucide-react';
-import type { Message, User } from '@/types/chat';
+import type { Message, User, QuotedMessage } from '@/types/chat';
 import { useWebSocket } from '@/hooks/use-websocket';
 import { FileUploadDialog } from './file-upload-dialog';
 import { MessageContextMenu } from './message-context-menu';
 import { MessageEditInput } from './message-edit-input';
 import { MessageReactions } from './message-reactions';
+import { QuotedMessagePreview } from './quoted-message-preview';
+import { QuotedMessageDisplay } from './quoted-message-display';
+import { MessageReplyButton } from './message-reply-button';
 import { toast } from 'sonner';
 
 interface ChatAreaProps {
@@ -36,6 +40,9 @@ export function ChatArea({ conversationId, currentUser }: ChatAreaProps) {
   const [isTyping, setIsTyping] = useState(false);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [quotedMessage, setQuotedMessage] = useState<QuotedMessage | null>(
+    null,
+  );
   const scrollRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -66,6 +73,7 @@ export function ChatArea({ conversationId, currentUser }: ChatAreaProps) {
     if (!conversationId) {
       setMessages([]);
       setEditingMessageId(null);
+      setQuotedMessage(null);
       return;
     }
 
@@ -81,7 +89,6 @@ export function ChatArea({ conversationId, currentUser }: ChatAreaProps) {
       if (incomingMessage.conversationId !== conversationId) return;
 
       setMessages(prev => {
-        // Avoid duplicates
         if (prev.some(m => m.id === incomingMessage.id)) return prev;
         return [...prev, incomingMessage];
       });
@@ -135,9 +142,20 @@ export function ChatArea({ conversationId, currentUser }: ChatAreaProps) {
     if (!newMessage.trim() || !conversationId) return;
 
     const messageContent = newMessage;
+    const replyingTo = quotedMessage;
     setNewMessage('');
+    setQuotedMessage(null);
 
     try {
+      // Find the quoted message ID
+      const quotedMsg = replyingTo
+        ? messages.find(
+            m =>
+              m.sender.name === replyingTo.senderName &&
+              m.content === replyingTo.content,
+          )
+        : null;
+
       const response = await fetch(
         `/api/conversations/${conversationId}/messages`,
         {
@@ -145,6 +163,7 @@ export function ChatArea({ conversationId, currentUser }: ChatAreaProps) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             content: messageContent,
+            quotedMessageId: quotedMsg?.id || null,
           }),
         },
       );
@@ -152,21 +171,21 @@ export function ChatArea({ conversationId, currentUser }: ChatAreaProps) {
       if (!response.ok) {
         toast.error('Failed to send message');
         setNewMessage(messageContent);
+        setQuotedMessage(replyingTo);
         return;
       }
 
       const sentMessage = await response.json();
 
-      // Add to local state immediately
       setMessages(prev => {
         if (prev.some(m => m.id === sentMessage.id)) return prev;
         return [...prev, sentMessage];
       });
 
-      // Send via WebSocket for real-time updates
       ws.sendMessage?.(conversationId, messageContent, {
         id: sentMessage.id,
         sender: currentUser,
+        quotedMessage: replyingTo,
       });
 
       if (typingTimeoutRef.current) {
@@ -177,7 +196,17 @@ export function ChatArea({ conversationId, currentUser }: ChatAreaProps) {
       console.error('Failed to send message:', error);
       toast.error('Failed to send message');
       setNewMessage(messageContent);
+      setQuotedMessage(replyingTo);
     }
+  };
+
+  const handleReplyClick = (message: Message) => {
+    setQuotedMessage({
+      id: message.id,
+      content: message.content,
+      senderName: message.sender.name || 'Unknown User',
+      senderId: message.senderId,
+    });
   };
 
   const handleEditMessage = (message: Message) => {
@@ -221,6 +250,16 @@ export function ChatArea({ conversationId, currentUser }: ChatAreaProps) {
       const formData = new FormData();
       formData.append('file', file);
       formData.append('caption', caption);
+      if (quotedMessage) {
+        const quotedMsg = messages.find(
+          m =>
+            m.sender.name === quotedMessage.senderName &&
+            m.content === quotedMessage.content,
+        );
+        if (quotedMsg) {
+          formData.append('quotedMessageId', quotedMsg.id);
+        }
+      }
 
       const uploadResponse = await fetch(
         `/api/conversations/${conversationId}/messages`,
@@ -248,7 +287,10 @@ export function ChatArea({ conversationId, currentUser }: ChatAreaProps) {
         fileUrl: sentMessage.fileUrl,
         fileName: sentMessage.fileName,
         fileType: sentMessage.fileType,
+        quotedMessage,
       });
+
+      setQuotedMessage(null);
     } catch (error) {
       console.error('Failed to upload file:', error);
       toast.error('Failed to upload file');
@@ -372,6 +414,13 @@ export function ChatArea({ conversationId, currentUser }: ChatAreaProps) {
                               : 'bg-muted'
                           } ${isDeleted ? 'italic opacity-50' : ''}`}
                         >
+                          {/* Display quoted message if exists */}
+                          {message.quotedMessage && !isDeleted && (
+                            <QuotedMessageDisplay
+                              quotedMessage={message.quotedMessage}
+                            />
+                          )}
+
                           {hasFile && !isDeleted && (
                             <div className='mb-2'>
                               {message.fileType?.startsWith('image/') ? (
@@ -401,13 +450,18 @@ export function ChatArea({ conversationId, currentUser }: ChatAreaProps) {
                         </div>
 
                         {!isDeleted && (
-                          <MessageContextMenu
-                            message={message}
-                            currentUser={currentUser}
-                            onEdit={handleEditMessage}
-                            onDelete={handleDeleteMessage}
-                            isEditing={isEditing}
-                          />
+                          <div className='flex gap-1'>
+                            <MessageReplyButton
+                              onReply={() => handleReplyClick(message)}
+                            />
+                            <MessageContextMenu
+                              message={message}
+                              currentUser={currentUser}
+                              onEdit={handleEditMessage}
+                              onDelete={handleDeleteMessage}
+                              isEditing={isEditing}
+                            />
+                          </div>
                         )}
                       </div>
                     )}
@@ -450,6 +504,14 @@ export function ChatArea({ conversationId, currentUser }: ChatAreaProps) {
 
       {/* Message Input */}
       <div className='border-t border-border p-4 bg-card'>
+        {/* Quoted Message Preview */}
+        {quotedMessage && (
+          <QuotedMessagePreview
+            quotedMessage={quotedMessage}
+            onRemove={() => setQuotedMessage(null)}
+          />
+        )}
+
         <form onSubmit={handleSendMessage} className='flex items-end gap-2'>
           <FileUploadDialog onUpload={handleFileUpload}>
             <Button
