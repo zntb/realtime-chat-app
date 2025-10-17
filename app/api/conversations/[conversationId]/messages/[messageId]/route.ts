@@ -4,7 +4,9 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { conversationId: string; messageId: string } },
+  {
+    params,
+  }: { params: Promise<{ conversationId: string; messageId: string }> },
 ) {
   try {
     const session = await auth.api.getSession({ headers: req.headers });
@@ -14,7 +16,7 @@ export async function PATCH(
     }
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { conversationId, messageId } = params;
+    const { conversationId, messageId } = await params;
     const { content } = await req.json();
 
     if (!content?.trim()) {
@@ -70,7 +72,9 @@ export async function PATCH(
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { conversationId: string; messageId: string } },
+  {
+    params,
+  }: { params: Promise<{ conversationId: string; messageId: string }> },
 ) {
   try {
     const session = await auth.api.getSession({ headers: req.headers });
@@ -79,7 +83,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { messageId } = params;
+    const { messageId } = await params;
 
     // Get message
     const message = await prisma.message.findUnique({

@@ -1,8 +1,17 @@
+// Update types/chat.ts
+
 export interface User {
   id: string;
   email: string;
   name: string | null;
-  image: string | null;
+  image?: string | null;
+}
+
+export interface ReactionData {
+  emoji: string;
+  count: number;
+  userReacted: boolean;
+  users: string[];
 }
 
 export interface Message {
@@ -17,6 +26,7 @@ export interface Message {
   isEdited: boolean;
   editedAt?: Date | null;
   deletedAt?: Date | null;
+  reactions?: Record<string, ReactionData>;
   createdAt: Date;
   updatedAt: Date;
 }

@@ -3,11 +3,13 @@ import type { Message, TypingStatus } from '@/types/chat';
 
 type MessageHandler = (message: Message) => void;
 type TypingHandler = (status: TypingStatus) => void;
+type ReactionHandler = (data: any) => void;
 
 export class WebSocketClient {
   private ws: WebSocket | null = null;
   private messageHandlers: Set<MessageHandler> = new Set();
   private typingHandlers: Set<TypingHandler> = new Set();
+  private reactionHandlers: Set<ReactionHandler> = new Set();
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private reconnectDelay = 1000;
@@ -52,6 +54,8 @@ export class WebSocketClient {
               isTyping: data.isTyping,
             };
             this.typingHandlers.forEach(handler => handler(status));
+          } else if (data.type === 'reaction') {
+            this.reactionHandlers.forEach(handler => handler(data));
           }
         } catch (error) {
           console.error('[ChatFlow] Error parsing WebSocket message:', error);
@@ -163,6 +167,25 @@ export class WebSocketClient {
   onMessage(handler: MessageHandler) {
     this.messageHandlers.add(handler);
     return () => this.messageHandlers.delete(handler);
+  }
+
+  sendReaction(
+    conversationId: string,
+    messageId: string,
+    emoji: string,
+    reactions: any,
+  ) {
+    this.send({
+      type: 'reaction',
+      conversationId,
+      userId: '', // Will be set by server
+      data: { messageId, emoji, reactions },
+    });
+  }
+
+  onReaction(handler: ReactionHandler) {
+    this.reactionHandlers.add(handler);
+    return () => this.reactionHandlers.delete(handler);
   }
 
   onTyping(handler: TypingHandler) {

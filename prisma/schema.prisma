@@ -21,6 +21,7 @@ model User {
   sentMessages  Message[]                 @relation("SentMessages")
   conversations ConversationParticipant[]
   typingStatus  TypingStatus[]
+  reactions     MessageReaction[]
 
   @@map("users")
 }
@@ -115,8 +116,9 @@ model Message {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
-  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  sender       User         @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  conversation Conversation      @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User              @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  reactions    MessageReaction[]
 
   @@index([conversationId])
   @@index([senderId])
@@ -134,4 +136,18 @@ model TypingStatus {
 
   @@unique([conversationId, userId])
   @@map("typing_status")
+}
+
+model MessageReaction {
+  id        String   @id @default(cuid())
+  messageId String
+  userId    String
+  emoji     String // e.g., "👍", "❤️", "😂", etc.
+  createdAt DateTime @default(now())
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId, emoji])
+  @@map("message_reactions")
 }
