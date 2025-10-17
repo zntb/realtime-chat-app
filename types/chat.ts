@@ -14,6 +14,13 @@ export interface ReactionData {
   users: string[];
 }
 
+export interface QuotedMessage {
+  id: string;
+  content: string;
+  senderName: string;
+  senderId: string;
+}
+
 export interface Message {
   id: string;
   content: string;
@@ -27,6 +34,8 @@ export interface Message {
   editedAt?: Date | null;
   deletedAt?: Date | null;
   reactions?: Record<string, ReactionData>;
+  quotedMessage?: QuotedMessage | null;
+  quotedMessageId?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }

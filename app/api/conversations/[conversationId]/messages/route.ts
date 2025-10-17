@@ -16,7 +16,6 @@ export async function GET(
 
     const { conversationId } = await params;
 
-    // Check if user is participant
     const isParticipant = await prisma.conversationParticipant.findFirst({
       where: {
         conversationId,
@@ -35,11 +34,27 @@ export async function GET(
       },
       include: {
         sender: true,
+        quotedMessage: {
+          include: { sender: true }, // NEW: Include quoted message details
+        },
       },
       orderBy: { createdAt: 'asc' },
     });
 
-    return NextResponse.json(messages, { status: 200 });
+    // Transform messages to format quoted message data
+    const formattedMessages = messages.map(msg => ({
+      ...msg,
+      quotedMessage: msg.quotedMessage
+        ? {
+            id: msg.quotedMessage.id,
+            content: msg.quotedMessage.content,
+            senderName: msg.quotedMessage.sender.name || 'Unknown',
+            senderId: msg.quotedMessage.senderId,
+          }
+        : null,
+    }));
+
+    return NextResponse.json(formattedMessages, { status: 200 });
   } catch (error) {
     console.error('[Messages GET] Error:', error);
     return NextResponse.json(
@@ -80,12 +95,13 @@ export async function POST(
     let fileUrl: string | null = null;
     let fileName: string | null = null;
     let fileType: string | null = null;
+    let quotedMessageId: string | null = null;
 
     if (contentType?.includes('multipart/form-data')) {
-      // Handle file upload
       const formData = await req.formData();
       const file = formData.get('file') as File;
       const caption = formData.get('caption') as string;
+      quotedMessageId = (formData.get('quotedMessageId') as string) || null;
 
       if (!file) {
         return NextResponse.json(
@@ -97,14 +113,11 @@ export async function POST(
       content = caption || `Shared ${file.name}`;
       fileName = file.name;
       fileType = file.type;
-
-      // TODO: Upload to file storage (S3, Vercel Blob, etc.)
-      // For now, we'll just store a placeholder URL
       fileUrl = URL.createObjectURL(file);
     } else {
-      // Handle text message
       const body = await req.json();
       content = body.content;
+      quotedMessageId = body.quotedMessageId || null;
 
       if (!content?.trim()) {
         return NextResponse.json(
@@ -114,7 +127,22 @@ export async function POST(
       }
     }
 
-    // Create message
+    // Validate quoted message if provided
+    if (quotedMessageId) {
+      const quotedMsg = await prisma.message.findUnique({
+        where: { id: quotedMessageId },
+        include: { sender: true },
+      });
+
+      if (!quotedMsg) {
+        return NextResponse.json(
+          { error: 'Quoted message not found' },
+          { status: 404 },
+        );
+      }
+    }
+
+    // Create message with quotedMessageId
     const message = await prisma.message.create({
       data: {
         content,
@@ -123,11 +151,28 @@ export async function POST(
         fileUrl,
         fileName,
         fileType,
+        quotedMessageId, // NEW: Add quoted message reference
       },
       include: {
         sender: true,
+        quotedMessage: {
+          include: { sender: true },
+        },
       },
     });
+
+    // Transform response to include formatted quoted message
+    const responseMessage = {
+      ...message,
+      quotedMessage: message.quotedMessage
+        ? {
+            id: message.quotedMessage.id,
+            content: message.quotedMessage.content,
+            senderName: message.quotedMessage.sender.name || 'Unknown',
+            senderId: message.quotedMessage.senderId,
+          }
+        : null,
+    };
 
     // Update conversation updatedAt
     await prisma.conversation.update({
@@ -135,7 +180,7 @@ export async function POST(
       data: { updatedAt: new Date() },
     });
 
-    return NextResponse.json(message, { status: 201 });
+    return NextResponse.json(responseMessage, { status: 201 });
   } catch (error) {
     console.error('[Messages POST] Error:', error);
     return NextResponse.json(
