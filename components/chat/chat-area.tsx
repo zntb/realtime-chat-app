@@ -20,6 +20,7 @@ import {
 import type { Message, User } from '@/types/chat';
 import { useWebSocket } from '@/hooks/use-websocket';
 import { FileUploadDialog } from './file-upload-dialog';
+import { toast } from 'sonner';
 
 interface ChatAreaProps {
   conversationId: string | null;
@@ -30,12 +31,44 @@ export function ChatArea({ conversationId, currentUser }: ChatAreaProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const messageIdCounterRef = useRef<number>(0);
 
   const ws = useWebSocket(currentUser.id);
 
+  // Fetch messages from database
+  const fetchMessages = async () => {
+    if (!conversationId) return;
+
+    try {
+      setIsLoadingMessages(true);
+      const response = await fetch(
+        `/api/conversations/${conversationId}/messages`,
+      );
+      if (response.ok) {
+        const data = await response.json();
+        setMessages(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch messages:', error);
+    } finally {
+      setIsLoadingMessages(false);
+    }
+  };
+
+  // Load messages when conversation changes
+  useEffect(() => {
+    if (!conversationId) {
+      setMessages([]);
+      return;
+    }
+
+    fetchMessages();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversationId]);
+
+  // Setup WebSocket listeners
   useEffect(() => {
     if (!conversationId) return;
 
@@ -43,7 +76,7 @@ export function ChatArea({ conversationId, currentUser }: ChatAreaProps) {
       if (incomingMessage.conversationId !== conversationId) return;
 
       setMessages(prev => {
-        // Skip if message with same id already exists
+        // Avoid duplicates
         if (prev.some(m => m.id === incomingMessage.id)) return prev;
         return [...prev, incomingMessage];
       });
@@ -67,96 +100,12 @@ export function ChatArea({ conversationId, currentUser }: ChatAreaProps) {
     };
   }, [conversationId, currentUser.id, ws]);
 
-  useEffect(() => {
-    if (!conversationId) {
-      setMessages([]);
-      return;
-    }
-
-    // Clear messages and reset counter when conversation changes
-    messageIdCounterRef.current = 0;
-    setMessages([]);
-
-    // Load mock messages for demo
-    if (conversationId === '1') {
-      const mockMessages: Message[] = [
-        {
-          id: 'mock-conv1-msg1',
-          content: 'Hey! How are you?',
-          conversationId: '1',
-          senderId: 'u1',
-          sender: {
-            id: 'u1',
-            email: 'alice@example.com',
-            name: 'Alice Johnson',
-            image: null,
-          },
-          createdAt: new Date(Date.now() - 3600000),
-          updatedAt: new Date(Date.now() - 3600000),
-        },
-        {
-          id: 'mock-conv1-msg2',
-          content: "I'm doing great! Just working on the new project.",
-          conversationId: '1',
-          senderId: currentUser.id,
-          sender: currentUser,
-          createdAt: new Date(Date.now() - 3000000),
-          updatedAt: new Date(Date.now() - 3000000),
-        },
-        {
-          id: 'mock-conv1-msg3',
-          content: 'That sounds exciting! Tell me more about it.',
-          conversationId: '1',
-          senderId: 'u1',
-          sender: {
-            id: 'u1',
-            email: 'alice@example.com',
-            name: 'Alice Johnson',
-            image: null,
-          },
-          createdAt: new Date(Date.now() - 1800000),
-          updatedAt: new Date(Date.now() - 1800000),
-        },
-      ];
-      setMessages(mockMessages);
-    } else if (conversationId === '2') {
-      const mockMessages: Message[] = [
-        {
-          id: 'mock-conv2-msg1',
-          content: "Let's schedule a meeting for tomorrow",
-          conversationId: '2',
-          senderId: 'u2',
-          sender: {
-            id: 'u2',
-            email: 'bob@example.com',
-            name: 'Bob Smith',
-            image: null,
-          },
-          createdAt: new Date(Date.now() - 7200000),
-          updatedAt: new Date(Date.now() - 7200000),
-        },
-        {
-          id: 'mock-conv2-msg2',
-          content: 'Sounds good! What time works for everyone?',
-          conversationId: '2',
-          senderId: 'u3',
-          sender: {
-            id: 'u3',
-            email: 'carol@example.com',
-            name: 'Carol White',
-            image: null,
-          },
-          createdAt: new Date(Date.now() - 3600000),
-          updatedAt: new Date(Date.now() - 3600000),
-        },
-      ];
-      setMessages(mockMessages);
-    }
-  }, [conversationId, currentUser]);
-
+  // Auto-scroll to bottom
   useEffect(() => {
     if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      setTimeout(() => {
+        scrollRef.current?.scrollTo(0, scrollRef.current.scrollHeight);
+      }, 0);
     }
   }, [messages]);
 
@@ -176,70 +125,96 @@ export function ChatArea({ conversationId, currentUser }: ChatAreaProps) {
     }
   };
 
-  const handleSendMessage = (e: React.FormEvent) => {
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim() || !conversationId) return;
 
-    messageIdCounterRef.current++;
-    const message: Message = {
-      id: `msg-${conversationId}-${messageIdCounterRef.current}`,
-      content: newMessage,
-      conversationId,
-      senderId: currentUser.id,
-      sender: currentUser,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
-    setMessages(prev => {
-      if (prev.some(m => m.id === message.id)) return prev;
-      return [...prev, message];
-    });
-    ws.sendMessage?.(conversationId, newMessage, {
-      id: message.id,
-      sender: currentUser,
-    });
+    const messageContent = newMessage;
     setNewMessage('');
 
-    if (typingTimeoutRef.current) {
-      clearTimeout(typingTimeoutRef.current);
+    try {
+      const response = await fetch(
+        `/api/conversations/${conversationId}/messages`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            content: messageContent,
+          }),
+        },
+      );
+
+      if (!response.ok) {
+        toast.error('Failed to send message');
+        setNewMessage(messageContent);
+        return;
+      }
+
+      const sentMessage = await response.json();
+
+      // Add to local state immediately
+      setMessages(prev => {
+        if (prev.some(m => m.id === sentMessage.id)) return prev;
+        return [...prev, sentMessage];
+      });
+
+      // Send via WebSocket for real-time updates
+      ws.sendMessage?.(conversationId, messageContent, {
+        id: sentMessage.id,
+        sender: currentUser,
+      });
+
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+      ws.sendTypingStatus?.(conversationId, false);
+    } catch (error) {
+      console.error('Failed to send message:', error);
+      toast.error('Failed to send message');
+      setNewMessage(messageContent);
     }
-    ws.sendTypingStatus?.(conversationId, false);
   };
 
-  const handleFileUpload = (file: File, caption: string) => {
+  const handleFileUpload = async (file: File, caption: string) => {
     if (!conversationId) return;
 
-    const id =
-      typeof crypto !== 'undefined' && crypto.randomUUID
-        ? crypto.randomUUID()
-        : `msg-${conversationId}-${messageIdCounterRef.current++}`;
+    try {
+      // Upload file
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('caption', caption);
 
-    messageIdCounterRef.current++;
-    const message: Message = {
-      id,
-      content: caption || `Shared ${file.name}`,
-      conversationId,
-      senderId: currentUser.id,
-      sender: currentUser,
-      fileUrl: URL.createObjectURL(file),
-      fileName: file.name,
-      fileType: file.type,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
+      const uploadResponse = await fetch(
+        `/api/conversations/${conversationId}/messages`,
+        {
+          method: 'POST',
+          body: formData,
+        },
+      );
 
-    setMessages(prev => {
-      if (prev.some(m => m.id === message.id)) return prev;
-      return [...prev, message];
-    });
-    ws.sendMessage?.(conversationId, message.content, {
-      id: message.id,
-      sender: currentUser,
-      fileUrl: message.fileUrl,
-      fileName: message.fileName,
-      fileType: message.fileType,
-    });
+      if (!uploadResponse.ok) {
+        toast.error('Failed to upload file');
+        return;
+      }
+
+      const sentMessage = await uploadResponse.json();
+
+      setMessages(prev => {
+        if (prev.some(m => m.id === sentMessage.id)) return prev;
+        return [...prev, sentMessage];
+      });
+
+      ws.sendMessage?.(conversationId, sentMessage.content, {
+        id: sentMessage.id,
+        sender: currentUser,
+        fileUrl: sentMessage.fileUrl,
+        fileName: sentMessage.fileName,
+        fileType: sentMessage.fileType,
+      });
+    } catch (error) {
+      console.error('Failed to upload file:', error);
+      toast.error('Failed to upload file');
+    }
   };
 
   if (!conversationId) {
@@ -265,18 +240,18 @@ export function ChatArea({ conversationId, currentUser }: ChatAreaProps) {
         <div className='flex items-center gap-3'>
           <Avatar className='h-9 w-9'>
             <AvatarImage src={'/file.svg'} />
-            <AvatarFallback>A</AvatarFallback>
+            <AvatarFallback>C</AvatarFallback>
           </Avatar>
           <div>
             <h2 className='font-semibold text-sm'>
-              {conversationId === '1' ? 'Alice Johnson' : 'Project Team'}
+              {conversationId === '1'
+                ? 'Alice Johnson'
+                : conversationId === '2'
+                ? 'Project Team'
+                : 'Chat'}
             </h2>
             <p className='text-xs text-muted-foreground'>
-              {isTyping
-                ? 'typing...'
-                : conversationId === '1'
-                ? 'Online'
-                : '3 members'}
+              {isTyping ? 'typing...' : 'Online'}
             </p>
           </div>
         </div>
@@ -296,78 +271,92 @@ export function ChatArea({ conversationId, currentUser }: ChatAreaProps) {
       {/* Messages Area */}
       <ScrollArea className='flex-1 p-6' ref={scrollRef}>
         <div className='space-y-4'>
-          {messages.map(message => {
-            const isCurrentUser = message.senderId === currentUser.id;
-            const hasFile = message.fileUrl && message.fileName;
-            return (
-              <div
-                key={message.id}
-                className={`flex gap-3 ${
-                  isCurrentUser ? 'flex-row-reverse' : ''
-                }`}
-              >
-                {!isCurrentUser && (
-                  <Avatar className='h-8 w-8 flex-shrink-0'>
-                    <AvatarImage src={message.sender.image || undefined} />
-                    <AvatarFallback>
-                      {message.sender.name?.charAt(0).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                )}
+          {isLoadingMessages ? (
+            <div className='flex items-center justify-center py-8'>
+              <p className='text-sm text-muted-foreground'>
+                Loading messages...
+              </p>
+            </div>
+          ) : messages.length === 0 ? (
+            <div className='flex items-center justify-center py-8'>
+              <p className='text-sm text-muted-foreground'>
+                No messages yet. Start the conversation!
+              </p>
+            </div>
+          ) : (
+            messages.map(message => {
+              const isCurrentUser = message.senderId === currentUser.id;
+              const hasFile = message.fileUrl && message.fileName;
+              return (
                 <div
-                  className={`flex flex-col ${
-                    isCurrentUser ? 'items-end' : 'items-start'
-                  } max-w-[70%]`}
+                  key={message.id}
+                  className={`flex gap-3 ${
+                    isCurrentUser ? 'flex-row-reverse' : ''
+                  }`}
                 >
                   {!isCurrentUser && (
-                    <span className='text-xs text-muted-foreground mb-1'>
-                      {message.sender.name}
-                    </span>
+                    <Avatar className='h-8 w-8 flex-shrink-0'>
+                      <AvatarImage src={message.sender.image || undefined} />
+                      <AvatarFallback>
+                        {message.sender.name?.charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
                   )}
                   <div
-                    className={`rounded-2xl px-4 py-2 ${
-                      isCurrentUser
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-muted'
-                    }`}
+                    className={`flex flex-col ${
+                      isCurrentUser ? 'items-end' : 'items-start'
+                    } max-w-[70%]`}
                   >
-                    {hasFile && (
-                      <div className='mb-2'>
-                        {message.fileType?.startsWith('image/') ? (
-                          <img
-                            src={message.fileUrl || ''}
-                            alt={message.fileName || ''}
-                            className='max-w-full rounded-lg mb-2'
-                          />
-                        ) : (
-                          <div className='flex items-center gap-2 p-2 bg-background/10 rounded-lg mb-2'>
-                            <FileIcon className='h-5 w-5' />
-                            <span className='text-sm flex-1'>
-                              {message.fileName}
-                            </span>
-                            <Button
-                              variant='ghost'
-                              size='icon'
-                              className='h-6 w-6'
-                            >
-                              <Download className='h-3 w-3' />
-                            </Button>
-                          </div>
-                        )}
-                      </div>
+                    {!isCurrentUser && (
+                      <span className='text-xs text-muted-foreground mb-1'>
+                        {message.sender.name}
+                      </span>
                     )}
-                    <p className='text-sm'>{message.content}</p>
+                    <div
+                      className={`rounded-2xl px-4 py-2 ${
+                        isCurrentUser
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-muted'
+                      }`}
+                    >
+                      {hasFile && (
+                        <div className='mb-2'>
+                          {message.fileType?.startsWith('image/') ? (
+                            <img
+                              src={message.fileUrl || ''}
+                              alt={message.fileName || ''}
+                              className='max-w-full rounded-lg mb-2'
+                            />
+                          ) : (
+                            <div className='flex items-center gap-2 p-2 bg-background/10 rounded-lg mb-2'>
+                              <FileIcon className='h-5 w-5' />
+                              <span className='text-sm flex-1'>
+                                {message.fileName}
+                              </span>
+                              <Button
+                                variant='ghost'
+                                size='icon'
+                                className='h-6 w-6 p-0'
+                              >
+                                <Download className='h-3 w-3' />
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      <p className='text-sm'>{message.content}</p>
+                    </div>
+                    <span className='text-xs text-muted-foreground mt-1'>
+                      {new Date(message.createdAt).toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </span>
                   </div>
-                  <span className='text-xs text-muted-foreground mt-1'>
-                    {message.createdAt.toLocaleTimeString([], {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </span>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })
+          )}
         </div>
       </ScrollArea>
 
