@@ -29,7 +29,10 @@ export async function GET(
     }
 
     const messages = await prisma.message.findMany({
-      where: { conversationId },
+      where: {
+        conversationId,
+        deletedAt: null,
+      },
       include: {
         sender: true,
       },

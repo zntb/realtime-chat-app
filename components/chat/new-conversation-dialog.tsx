@@ -23,6 +23,7 @@ interface NewConversationDialogProps {
 export function NewConversationDialog({
   onConversationCreated,
   children,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   availableUsers = [],
 }: NewConversationDialogProps) {
   const [open, setOpen] = useState(false);
