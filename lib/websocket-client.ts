@@ -16,17 +16,23 @@ export class WebSocketClient {
 
   connect(userId: string) {
     try {
+      // Check if we're in a browser environment
+      if (typeof window === 'undefined') {
+        console.warn('[ChatFlow] WebSocket only works in browser environment');
+        return;
+      }
+
       this.ws = new WebSocket(this.url);
 
       this.ws.onopen = () => {
-        console.log('[v0] WebSocket connected');
+        console.log('[ChatFlow] WebSocket connected');
         this.reconnectAttempts = 0;
       };
 
       this.ws.onmessage = event => {
         try {
           const data = JSON.parse(event.data);
-          console.log('[v0] Received WebSocket message:', data.type);
+          console.log('[ChatFlow] Received WebSocket message:', data.type);
 
           if (data.type === 'message') {
             const message: Message = {
@@ -48,20 +54,29 @@ export class WebSocketClient {
             this.typingHandlers.forEach(handler => handler(status));
           }
         } catch (error) {
-          console.error('[v0] Error parsing WebSocket message:', error);
+          console.error('[ChatFlow] Error parsing WebSocket message:', error);
         }
       };
 
       this.ws.onclose = () => {
-        console.log('[v0] WebSocket disconnected');
+        console.log('[ChatFlow] WebSocket disconnected');
         this.attemptReconnect(userId);
       };
 
       this.ws.onerror = error => {
-        console.error('[v0] WebSocket error:', error);
+        console.error(
+          '[ChatFlow] WebSocket error:',
+          error instanceof Error ? error.message : 'Unknown error',
+        );
+        console.warn(
+          '[ChatFlow] Make sure the WebSocket server is running on ' + this.url,
+        );
       };
     } catch (error) {
-      console.error('[v0] Error connecting to WebSocket:', error);
+      console.error(
+        '[ChatFlow] Error connecting to WebSocket:',
+        error instanceof Error ? error.message : error,
+      );
     }
   }
 
@@ -69,11 +84,15 @@ export class WebSocketClient {
     if (this.reconnectAttempts < this.maxReconnectAttempts) {
       this.reconnectAttempts++;
       console.log(
-        `[v0] Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`,
+        `[ChatFlow] Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`,
       );
       setTimeout(
         () => this.connect(userId),
         this.reconnectDelay * this.reconnectAttempts,
+      );
+    } else {
+      console.error(
+        '[ChatFlow] Max reconnection attempts reached. WebSocket server may not be running.',
       );
     }
   }
@@ -132,7 +151,7 @@ export class WebSocketClient {
     if (this.ws?.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(data));
     } else {
-      console.warn('[v0] WebSocket is not connected');
+      console.warn('[ChatFlow] WebSocket is not connected. Message queued.');
     }
   }
 
