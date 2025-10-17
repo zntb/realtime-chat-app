@@ -8,7 +8,7 @@ interface WebSocketClient extends WebSocket {
 }
 
 interface WebSocketMessage {
-  type: 'message' | 'typing' | 'join' | 'leave';
+  type: 'message' | 'typing' | 'join' | 'reaction' | 'leave';
   conversationId: string;
   userId: string;
   content?: string;
@@ -35,6 +35,9 @@ export function createWebSocketServer(port = 3001) {
             break;
           case 'message':
             handleMessage(message);
+            break;
+          case 'reaction':
+            handleReaction(message);
             break;
           case 'typing':
             handleTyping(message);
@@ -106,6 +109,28 @@ export function createWebSocketServer(port = 3001) {
             conversationId: message.conversationId,
             userId: message.userId,
             isTyping: message.data?.isTyping || false,
+          }),
+        );
+      }
+    });
+  }
+
+  function handleReaction(message: WebSocketMessage) {
+    // Broadcast reaction to all clients in the conversation
+    clients.forEach(client => {
+      if (
+        client.conversationIds?.has(message.conversationId) &&
+        client.readyState === WebSocket.OPEN
+      ) {
+        client.send(
+          JSON.stringify({
+            type: 'reaction',
+            conversationId: message.conversationId,
+            messageId: message.data?.messageId,
+            emoji: message.data?.emoji,
+            userId: message.userId,
+            reactions: message.data?.reactions,
+            timestamp: new Date().toISOString(),
           }),
         );
       }

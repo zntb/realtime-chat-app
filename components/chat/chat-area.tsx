@@ -22,6 +22,7 @@ import { useWebSocket } from '@/hooks/use-websocket';
 import { FileUploadDialog } from './file-upload-dialog';
 import { MessageContextMenu } from './message-context-menu';
 import { MessageEditInput } from './message-edit-input';
+import { MessageReactions } from './message-reactions';
 import { toast } from 'sonner';
 
 interface ChatAreaProps {
@@ -408,6 +409,25 @@ export function ChatArea({ conversationId, currentUser }: ChatAreaProps) {
                             isEditing={isEditing}
                           />
                         )}
+                      </div>
+                    )}
+
+                    {!isDeleted && (
+                      <div className='mt-2'>
+                        <MessageReactions
+                          messageId={message.id}
+                          conversationId={conversationId}
+                          reactions={message.reactions || {}}
+                          onReactionAdded={updatedReactions => {
+                            setMessages(prev =>
+                              prev.map(m =>
+                                m.id === message.id
+                                  ? { ...m, reactions: updatedReactions }
+                                  : m,
+                              ),
+                            );
+                          }}
+                        />
                       </div>
                     )}
 

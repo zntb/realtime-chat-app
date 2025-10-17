@@ -55,6 +55,10 @@ export function useWebSocket(userId: string | undefined) {
     return wsClient.current?.onTyping(handler);
   };
 
+  const onReaction = (handler: (data: any) => void) => {
+    return wsClient.current?.onReaction(handler);
+  };
+
   return {
     isConnected,
     joinConversation,
@@ -63,5 +67,6 @@ export function useWebSocket(userId: string | undefined) {
     sendTypingStatus,
     onMessage,
     onTyping,
+    onReaction,
   };
 }

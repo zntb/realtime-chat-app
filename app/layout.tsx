@@ -11,7 +11,7 @@ export const metadata: Metadata = {
   title: 'ChatFlow - Real-time Messaging',
   description:
     'Connect instantly with real-time messaging, group chats, and file sharing',
-  generator: 'v0.app',
+  generator: 'Next.js',
 };
 
 export default function RootLayout({
