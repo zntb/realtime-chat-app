@@ -39,10 +39,14 @@ export function ChatArea({ conversationId, currentUser }: ChatAreaProps) {
   useEffect(() => {
     if (!conversationId) return;
 
-    const unsubscribeMessage = ws.onMessage?.(message => {
-      if (message.conversationId === conversationId) {
-        setMessages(prev => [...prev, message]);
-      }
+    const unsubscribeMessage = ws.onMessage?.(incomingMessage => {
+      if (incomingMessage.conversationId !== conversationId) return;
+
+      setMessages(prev => {
+        // Skip if message with same id already exists
+        if (prev.some(m => m.id === incomingMessage.id)) return prev;
+        return [...prev, incomingMessage];
+      });
     });
 
     const unsubscribeTyping = ws.onTyping?.(status => {
@@ -187,7 +191,10 @@ export function ChatArea({ conversationId, currentUser }: ChatAreaProps) {
       updatedAt: new Date(),
     };
 
-    setMessages([...messages, message]);
+    setMessages(prev => {
+      if (prev.some(m => m.id === message.id)) return prev;
+      return [...prev, message];
+    });
     ws.sendMessage?.(conversationId, newMessage, {
       id: message.id,
       sender: currentUser,
@@ -203,9 +210,14 @@ export function ChatArea({ conversationId, currentUser }: ChatAreaProps) {
   const handleFileUpload = (file: File, caption: string) => {
     if (!conversationId) return;
 
+    const id =
+      typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `msg-${conversationId}-${messageIdCounterRef.current++}`;
+
     messageIdCounterRef.current++;
     const message: Message = {
-      id: `msg-${conversationId}-${messageIdCounterRef.current}`,
+      id,
       content: caption || `Shared ${file.name}`,
       conversationId,
       senderId: currentUser.id,
@@ -217,7 +229,10 @@ export function ChatArea({ conversationId, currentUser }: ChatAreaProps) {
       updatedAt: new Date(),
     };
 
-    setMessages([...messages, message]);
+    setMessages(prev => {
+      if (prev.some(m => m.id === message.id)) return prev;
+      return [...prev, message];
+    });
     ws.sendMessage?.(conversationId, message.content, {
       id: message.id,
       sender: currentUser,

@@ -28,7 +28,6 @@ export class WebSocketClient {
         console.log('[ChatFlow] WebSocket connected');
         this.reconnectAttempts = 0;
       };
-
       this.ws.onmessage = event => {
         try {
           const data = JSON.parse(event.data);
@@ -58,8 +57,31 @@ export class WebSocketClient {
         }
       };
 
-      this.ws.onclose = () => {
-        console.log('[ChatFlow] WebSocket disconnected');
+      this.ws.onerror = ev => {
+        // Browser gives an Event — log it and any nested error if present
+        console.error('[ChatFlow] WebSocket error event:', ev);
+        // Sometimes the underlying error is on ev (non-standard); attempt to log any property
+        try {
+          const maybeError = (ev as any).error ?? (ev as any).reason;
+          if (maybeError)
+            console.error('[ChatFlow] Underlying error:', maybeError);
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        } catch (e) {
+          // ignore
+        }
+        console.warn(
+          '[ChatFlow] Make sure the WebSocket server is running on ' + this.url,
+        );
+      };
+
+      this.ws.onclose = (ev: CloseEvent) => {
+        console.log(
+          '[ChatFlow] WebSocket disconnected',
+          'code=' + ev.code,
+          'reason=' + (ev.reason || '<none>'),
+          'wasClean=' + ev.wasClean,
+        );
+        // attempt reconnect after logging close details
         this.attemptReconnect(userId);
       };
 
