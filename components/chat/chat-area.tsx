@@ -20,6 +20,8 @@ import {
 import type { Message, User } from '@/types/chat';
 import { useWebSocket } from '@/hooks/use-websocket';
 import { FileUploadDialog } from './file-upload-dialog';
+import { MessageContextMenu } from './message-context-menu';
+import { MessageEditInput } from './message-edit-input';
 import { toast } from 'sonner';
 
 interface ChatAreaProps {
@@ -32,6 +34,7 @@ export function ChatArea({ conversationId, currentUser }: ChatAreaProps) {
   const [newMessage, setNewMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -61,6 +64,7 @@ export function ChatArea({ conversationId, currentUser }: ChatAreaProps) {
   useEffect(() => {
     if (!conversationId) {
       setMessages([]);
+      setEditingMessageId(null);
       return;
     }
 
@@ -175,11 +179,44 @@ export function ChatArea({ conversationId, currentUser }: ChatAreaProps) {
     }
   };
 
+  const handleEditMessage = (message: Message) => {
+    setEditingMessageId(message.id);
+  };
+
+  const handleSaveEdit = (newContent: string) => {
+    setMessages(prev =>
+      prev.map(msg =>
+        msg.id === editingMessageId
+          ? {
+              ...msg,
+              content: newContent,
+              isEdited: true,
+              editedAt: new Date(),
+            }
+          : msg,
+      ),
+    );
+    setEditingMessageId(null);
+  };
+
+  const handleDeleteMessage = (messageId: string) => {
+    setMessages(prev =>
+      prev.map(msg =>
+        msg.id === messageId
+          ? {
+              ...msg,
+              content: '[This message was deleted]',
+              deletedAt: new Date(),
+            }
+          : msg,
+      ),
+    );
+  };
+
   const handleFileUpload = async (file: File, caption: string) => {
     if (!conversationId) return;
 
     try {
-      // Upload file
       const formData = new FormData();
       formData.append('file', file);
       formData.append('caption', caption);
@@ -287,10 +324,14 @@ export function ChatArea({ conversationId, currentUser }: ChatAreaProps) {
             messages.map(message => {
               const isCurrentUser = message.senderId === currentUser.id;
               const hasFile = message.fileUrl && message.fileName;
+              const isDeleted =
+                message.content === '[This message was deleted]';
+              const isEditing = editingMessageId === message.id;
+
               return (
                 <div
                   key={message.id}
-                  className={`flex gap-3 ${
+                  className={`flex gap-3 group ${
                     isCurrentUser ? 'flex-row-reverse' : ''
                   }`}
                 >
@@ -312,46 +353,73 @@ export function ChatArea({ conversationId, currentUser }: ChatAreaProps) {
                         {message.sender.name}
                       </span>
                     )}
-                    <div
-                      className={`rounded-2xl px-4 py-2 ${
-                        isCurrentUser
-                          ? 'bg-primary text-primary-foreground'
-                          : 'bg-muted'
-                      }`}
-                    >
-                      {hasFile && (
-                        <div className='mb-2'>
-                          {message.fileType?.startsWith('image/') ? (
-                            <img
-                              src={message.fileUrl || ''}
-                              alt={message.fileName || ''}
-                              className='max-w-full rounded-lg mb-2'
-                            />
-                          ) : (
-                            <div className='flex items-center gap-2 p-2 bg-background/10 rounded-lg mb-2'>
-                              <FileIcon className='h-5 w-5' />
-                              <span className='text-sm flex-1'>
-                                {message.fileName}
-                              </span>
-                              <Button
-                                variant='ghost'
-                                size='icon'
-                                className='h-6 w-6 p-0'
-                              >
-                                <Download className='h-3 w-3' />
-                              </Button>
+
+                    {isEditing ? (
+                      <MessageEditInput
+                        messageId={message.id}
+                        conversationId={conversationId}
+                        initialContent={message.content}
+                        onSave={handleSaveEdit}
+                        onCancel={() => setEditingMessageId(null)}
+                      />
+                    ) : (
+                      <div className='flex gap-2 items-start'>
+                        <div
+                          className={`rounded-2xl px-4 py-2 ${
+                            isCurrentUser
+                              ? 'bg-primary text-primary-foreground'
+                              : 'bg-muted'
+                          } ${isDeleted ? 'italic opacity-50' : ''}`}
+                        >
+                          {hasFile && !isDeleted && (
+                            <div className='mb-2'>
+                              {message.fileType?.startsWith('image/') ? (
+                                <img
+                                  src={message.fileUrl || ''}
+                                  alt={message.fileName || ''}
+                                  className='max-w-full rounded-lg mb-2'
+                                />
+                              ) : (
+                                <div className='flex items-center gap-2 p-2 bg-background/10 rounded-lg mb-2'>
+                                  <FileIcon className='h-5 w-5' />
+                                  <span className='text-sm flex-1'>
+                                    {message.fileName}
+                                  </span>
+                                  <Button
+                                    variant='ghost'
+                                    size='icon'
+                                    className='h-6 w-6 p-0'
+                                  >
+                                    <Download className='h-3 w-3' />
+                                  </Button>
+                                </div>
+                              )}
                             </div>
                           )}
+                          <p className='text-sm'>{message.content}</p>
                         </div>
-                      )}
-                      <p className='text-sm'>{message.content}</p>
+
+                        {!isDeleted && (
+                          <MessageContextMenu
+                            message={message}
+                            currentUser={currentUser}
+                            onEdit={handleEditMessage}
+                            onDelete={handleDeleteMessage}
+                            isEditing={isEditing}
+                          />
+                        )}
+                      </div>
+                    )}
+
+                    <div className='flex gap-2 text-xs text-muted-foreground mt-1'>
+                      <span>
+                        {new Date(message.createdAt).toLocaleTimeString([], {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </span>
+                      {message.isEdited && <span>(edited)</span>}
                     </div>
-                    <span className='text-xs text-muted-foreground mt-1'>
-                      {new Date(message.createdAt).toLocaleTimeString([], {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </span>
                   </div>
                 </div>
               );

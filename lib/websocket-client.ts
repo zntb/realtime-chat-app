@@ -42,6 +42,7 @@ export class WebSocketClient {
               sender: data.data?.sender,
               createdAt: new Date(data.timestamp),
               updatedAt: new Date(data.timestamp),
+              isEdited: false,
             };
             this.messageHandlers.forEach(handler => handler(message));
           } else if (data.type === 'typing') {
