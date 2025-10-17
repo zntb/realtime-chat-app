@@ -1,5 +1,5 @@
-@import "tailwindcss";
-@import "tw-animate-css";
+@import 'tailwindcss';
+@import 'tw-animate-css';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -118,5 +118,361 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+/* Add these styles to your app/globals.css file */
+
+/* Smooth animations */
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes typingBounce {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+  }
+  30% {
+    transform: translateY(-10px);
+  }
+}
+
+.animate-slide-up {
+  animation: slideUp 0.3s ease-out;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out;
+}
+
+/* Typing indicator animation */
+.animate-typing-bounce {
+  animation: typingBounce 1.4s infinite;
+}
+
+.delay-100 {
+  animation-delay: 0.1s;
+}
+
+.delay-200 {
+  animation-delay: 0.2s;
+}
+
+/* Message container styling */
+.message-container {
+  transition: all 0.2s ease;
+}
+
+.message-container:hover {
+  transform: translateY(-1px);
+}
+
+/* Emoji styling */
+.emoji-reaction {
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.emoji-reaction:hover {
+  transform: scale(1.1);
+  background-color: rgba(59, 130, 246, 0.15);
+}
+
+.emoji-reaction.active {
+  background-color: rgba(59, 130, 246, 0.2);
+  border-color: rgb(59, 130, 246);
+}
+
+/* Message bubble enhancements */
+.message-bubble {
+  transition: all 0.2s ease;
+  word-break: break-word;
+}
+
+.message-bubble-sent {
+  background: linear-gradient(
+    135deg,
+    rgb(59, 130, 246) 0%,
+    rgb(37, 99, 235) 100%
+  );
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.message-bubble-sent:hover {
+  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+}
+
+.message-bubble-received {
+  background-color: rgb(241, 245, 249);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.dark .message-bubble-received {
+  background-color: rgb(30, 41, 59);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.message-bubble-received:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.dark .message-bubble-received:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+/* Input field styling */
+.message-input {
+  transition: all 0.2s ease;
+}
+
+.message-input:focus {
+  border-color: rgb(59, 130, 246);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* Quoted message styling */
+.quoted-message {
+  border-left: 3px solid rgb(59, 130, 246);
+  background-color: rgba(59, 130, 246, 0.05);
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+.dark .quoted-message {
+  background-color: rgba(59, 130, 246, 0.08);
+}
+
+.quoted-message-sender {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgb(59, 130, 246);
+  margin-bottom: 4px;
+}
+
+.quoted-message-content {
+  font-size: 13px;
+  color: rgb(100, 116, 139);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dark .quoted-message-content {
+  color: rgb(148, 163, 184);
+}
+
+/* Avatar styling */
+.avatar-ring {
+  ring: 2px rgb(59, 130, 246) / 0.2;
+}
+
+/* File upload styling */
+.file-preview {
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.dark .file-preview {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.file-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background-color: rgb(248, 250, 252);
+  border-radius: 8px;
+  border: 1px solid rgb(226, 232, 240);
+}
+
+.dark .file-item {
+  background-color: rgb(30, 41, 59);
+  border-color: rgb(51, 65, 85);
+}
+
+/* Scrollbar styling */
+.scroll-area-thumb {
+  background-color: rgb(203, 213, 225);
+  border-radius: 8px;
+}
+
+.scroll-area-thumb:hover {
+  background-color: rgb(148, 163, 184);
+}
+
+.dark .scroll-area-thumb {
+  background-color: rgb(71, 85, 105);
+}
+
+.dark .scroll-area-thumb:hover {
+  background-color: rgb(100, 116, 139);
+}
+
+/* Header styling */
+.chat-header {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.7) 0%,
+    rgba(255, 255, 255, 0.5) 100%
+  );
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid rgba(59, 130, 246, 0.1);
+}
+
+.dark .chat-header {
+  background: linear-gradient(
+    180deg,
+    rgba(15, 23, 42, 0.7) 0%,
+    rgba(15, 23, 42, 0.5) 100%
+  );
+  border-bottom: 1px solid rgba(59, 130, 246, 0.1);
+}
+
+/* Status indicator */
+.status-online {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: rgb(34, 197, 94);
+  box-shadow: 0 0 0 2px rgb(255, 255, 255);
+}
+
+.dark .status-online {
+  box-shadow: 0 0 0 2px rgb(15, 23, 42);
+}
+
+/* Dropdown menu fix */
+[data-radix-dropdown-menu-content] {
+  z-index: 50 !important;
+}
+
+/* Reaction picker styling */
+.emoji-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(40px, 1fr));
+  gap: 8px;
+  padding: 12px;
+  background-color: rgb(255, 255, 255);
+  border: 1px solid rgb(226, 232, 240);
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+  z-index: 50;
+}
+
+.dark .emoji-picker {
+  background-color: rgb(30, 41, 59);
+  border-color: rgb(51, 65, 85);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+}
+
+.emoji-picker-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-radius: 8px;
+  padding: 6px;
+}
+
+.emoji-picker-button:hover {
+  transform: scale(1.2);
+  background-color: rgba(59, 130, 246, 0.1);
+}
+
+/* Loading state */
+.loading-skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(226, 232, 240, 0.6) 25%,
+    rgba(226, 232, 240, 0.3) 50%,
+    rgba(226, 232, 240, 0.6) 75%
+  );
+  background-size: 200% 100%;
+  animation: loading 1.5s infinite;
+}
+
+.dark .loading-skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(51, 65, 85, 0.6) 25%,
+    rgba(51, 65, 85, 0.3) 50%,
+    rgba(51, 65, 85, 0.6) 75%
+  );
+  background-size: 200% 100%;
+  animation: loading 1.5s infinite;
+}
+
+@keyframes loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* Edit indicator */
+.edit-indicator {
+  font-size: 12px;
+  color: rgb(100, 116, 139);
+  font-style: italic;
+}
+
+.dark .edit-indicator {
+  color: rgb(148, 163, 184);
+}
+
+/* Message timestamp */
+.message-timestamp {
+  font-size: 12px;
+  color: rgb(148, 163, 184);
+  transition: opacity 0.2s ease;
+}
+
+/* Smooth transitions for all interactive elements */
+button,
+input,
+textarea,
+[role='button'] {
+  transition: all 0.2s ease;
+}
+
+/* Better focus states */
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid rgb(59, 130, 246);
+  outline-offset: 2px;
+}
+
+/* Optimized for reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

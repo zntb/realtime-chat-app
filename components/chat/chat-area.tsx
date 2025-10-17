@@ -1,6 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @next/next/no-img-element */
-// Update: components/chat/chat-area.tsx - Key additions for reply feature
-
 'use client';
 
 import type React from 'react';
@@ -12,11 +11,12 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Send,
   Paperclip,
-  MoreVertical,
   Phone,
   Video,
+  MoreVertical,
   FileIcon,
   Download,
+  Smile,
 } from 'lucide-react';
 import type { Message, User, QuotedMessage } from '@/types/chat';
 import { useWebSocket } from '@/hooks/use-websocket';
@@ -34,6 +34,8 @@ interface ChatAreaProps {
   currentUser: User;
 }
 
+const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🔥'];
+
 export function ChatArea({ conversationId, currentUser }: ChatAreaProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
@@ -43,12 +45,13 @@ export function ChatArea({ conversationId, currentUser }: ChatAreaProps) {
   const [quotedMessage, setQuotedMessage] = useState<QuotedMessage | null>(
     null,
   );
+  const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
+  const [showEmojiPicker, setShowEmojiPicker] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const ws = useWebSocket(currentUser.id);
 
-  // Fetch messages from database
   const fetchMessages = async () => {
     if (!conversationId) return;
 
@@ -63,12 +66,12 @@ export function ChatArea({ conversationId, currentUser }: ChatAreaProps) {
       }
     } catch (error) {
       console.error('Failed to fetch messages:', error);
+      toast.error('Failed to load messages');
     } finally {
       setIsLoadingMessages(false);
     }
   };
 
-  // Load messages when conversation changes
   useEffect(() => {
     if (!conversationId) {
       setMessages([]);
@@ -81,7 +84,6 @@ export function ChatArea({ conversationId, currentUser }: ChatAreaProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId]);
 
-  // Setup WebSocket listeners
   useEffect(() => {
     if (!conversationId) return;
 
@@ -112,7 +114,6 @@ export function ChatArea({ conversationId, currentUser }: ChatAreaProps) {
     };
   }, [conversationId, currentUser.id, ws]);
 
-  // Auto-scroll to bottom
   useEffect(() => {
     if (scrollRef.current) {
       setTimeout(() => {
@@ -147,7 +148,6 @@ export function ChatArea({ conversationId, currentUser }: ChatAreaProps) {
     setQuotedMessage(null);
 
     try {
-      // Find the quoted message ID
       const quotedMsg = replyingTo
         ? messages.find(
             m =>
@@ -180,12 +180,6 @@ export function ChatArea({ conversationId, currentUser }: ChatAreaProps) {
       setMessages(prev => {
         if (prev.some(m => m.id === sentMessage.id)) return prev;
         return [...prev, sentMessage];
-      });
-
-      ws.sendMessage?.(conversationId, messageContent, {
-        id: sentMessage.id,
-        sender: currentUser,
-        quotedMessage: replyingTo,
       });
 
       if (typingTimeoutRef.current) {
@@ -281,15 +275,6 @@ export function ChatArea({ conversationId, currentUser }: ChatAreaProps) {
         return [...prev, sentMessage];
       });
 
-      ws.sendMessage?.(conversationId, sentMessage.content, {
-        id: sentMessage.id,
-        sender: currentUser,
-        fileUrl: sentMessage.fileUrl,
-        fileName: sentMessage.fileName,
-        fileType: sentMessage.fileType,
-        quotedMessage,
-      });
-
       setQuotedMessage(null);
     } catch (error) {
       console.error('Failed to upload file:', error);
@@ -297,16 +282,66 @@ export function ChatArea({ conversationId, currentUser }: ChatAreaProps) {
     }
   };
 
+  const handleQuickReaction = async (messageId: string, emoji: string) => {
+    if (!conversationId) return;
+
+    try {
+      const response = await fetch(
+        `/api/conversations/${conversationId}/messages/${messageId}/reactions`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ emoji }),
+        },
+      );
+
+      if (!response.ok) {
+        toast.error('Failed to add reaction');
+        return;
+      }
+
+      const data = await response.json();
+      const groupedReactions = data.reactions.reduce(
+        (acc: Record<string, any>, reaction: any) => {
+          if (!acc[reaction.emoji]) {
+            acc[reaction.emoji] = {
+              emoji: reaction.emoji,
+              count: 0,
+              userReacted: false,
+              users: [],
+            };
+          }
+          acc[reaction.emoji].count++;
+          acc[reaction.emoji].users.push(reaction.userName);
+          return acc;
+        },
+        {} as Record<string, any>,
+      );
+
+      setMessages(prev =>
+        prev.map(m =>
+          m.id === messageId ? { ...m, reactions: groupedReactions } : m,
+        ),
+      );
+
+      setShowEmojiPicker(null);
+      toast.success('Reaction added');
+    } catch (error) {
+      console.error('Reaction error:', error);
+      toast.error('Failed to add reaction');
+    }
+  };
+
   if (!conversationId) {
     return (
-      <div className='flex-1 flex items-center justify-center bg-muted/30'>
+      <div className='flex-1 flex items-center justify-center bg-gradient-to-br from-background to-muted/20'>
         <div className='text-center'>
-          <div className='w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4'>
-            <Send className='h-8 w-8 text-primary' />
+          <div className='w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6'>
+            <Send className='h-10 w-10 text-primary/60' />
           </div>
-          <h3 className='text-lg font-semibold mb-2'>Select a conversation</h3>
-          <p className='text-muted-foreground'>
-            Choose a conversation from the sidebar to start chatting
+          <h3 className='text-2xl font-bold mb-2'>Select a conversation</h3>
+          <p className='text-muted-foreground text-lg'>
+            Choose a chat from the sidebar to start messaging
           </p>
         </div>
       </div>
@@ -314,16 +349,16 @@ export function ChatArea({ conversationId, currentUser }: ChatAreaProps) {
   }
 
   return (
-    <div className='flex-1 flex flex-col'>
+    <div className='flex-1 flex flex-col bg-background'>
       {/* Chat Header */}
-      <div className='h-16 border-b border-border flex items-center justify-between px-6 bg-card'>
+      <div className='h-16 border-b border-border/50 flex items-center justify-between px-6 bg-card/50 backdrop-blur-sm'>
         <div className='flex items-center gap-3'>
-          <Avatar className='h-9 w-9'>
+          <Avatar className='h-10 w-10 ring-2 ring-primary/20'>
             <AvatarImage src={'/file.svg'} />
             <AvatarFallback>C</AvatarFallback>
           </Avatar>
           <div>
-            <h2 className='font-semibold text-sm'>
+            <h2 className='font-semibold text-base'>
               {conversationId === '1'
                 ? 'Alice Johnson'
                 : conversationId === '2'
@@ -331,18 +366,29 @@ export function ChatArea({ conversationId, currentUser }: ChatAreaProps) {
                 : 'Chat'}
             </h2>
             <p className='text-xs text-muted-foreground'>
-              {isTyping ? 'typing...' : 'Online'}
+              {isTyping ? (
+                <span className='flex items-center gap-1'>
+                  typing
+                  <span className='flex gap-0.5'>
+                    <span className='w-1 h-1 bg-muted-foreground rounded-full animate-bounce' />
+                    <span className='w-1 h-1 bg-muted-foreground rounded-full animate-bounce delay-100' />
+                    <span className='w-1 h-1 bg-muted-foreground rounded-full animate-bounce delay-200' />
+                  </span>
+                </span>
+              ) : (
+                'Online'
+              )}
             </p>
           </div>
         </div>
-        <div className='flex items-center gap-2'>
-          <Button variant='ghost' size='icon'>
+        <div className='flex items-center gap-1'>
+          <Button variant='ghost' size='icon' className='hover:bg-accent'>
             <Phone className='h-4 w-4' />
           </Button>
-          <Button variant='ghost' size='icon'>
+          <Button variant='ghost' size='icon' className='hover:bg-accent'>
             <Video className='h-4 w-4' />
           </Button>
-          <Button variant='ghost' size='icon'>
+          <Button variant='ghost' size='icon' className='hover:bg-accent'>
             <MoreVertical className='h-4 w-4' />
           </Button>
         </div>
@@ -350,49 +396,67 @@ export function ChatArea({ conversationId, currentUser }: ChatAreaProps) {
 
       {/* Messages Area */}
       <ScrollArea className='flex-1 p-6' ref={scrollRef}>
-        <div className='space-y-4'>
+        <div className='space-y-3 max-w-4xl mx-auto'>
           {isLoadingMessages ? (
-            <div className='flex items-center justify-center py-8'>
+            <div className='flex items-center justify-center py-12'>
               <p className='text-sm text-muted-foreground'>
                 Loading messages...
               </p>
             </div>
           ) : messages.length === 0 ? (
-            <div className='flex items-center justify-center py-8'>
+            <div className='flex items-center justify-center py-12'>
               <p className='text-sm text-muted-foreground'>
                 No messages yet. Start the conversation!
               </p>
             </div>
           ) : (
-            messages.map(message => {
+            messages.map((message, index) => {
               const isCurrentUser = message.senderId === currentUser.id;
               const hasFile = message.fileUrl && message.fileName;
               const isDeleted =
                 message.content === '[This message was deleted]';
               const isEditing = editingMessageId === message.id;
+              const prevMessage = index > 0 ? messages[index - 1] : null;
+              const showAvatar =
+                !prevMessage ||
+                prevMessage.senderId !== message.senderId ||
+                new Date(message.createdAt).getTime() -
+                  new Date(prevMessage.createdAt).getTime() >
+                  60000;
 
               return (
                 <div
                   key={message.id}
                   className={`flex gap-3 group ${
                     isCurrentUser ? 'flex-row-reverse' : ''
-                  }`}
+                  } animate-slide-up`}
+                  onMouseEnter={() => setHoveredMessageId(message.id)}
+                  onMouseLeave={() => setHoveredMessageId(null)}
                 >
                   {!isCurrentUser && (
-                    <Avatar className='h-8 w-8 flex-shrink-0'>
-                      <AvatarImage src={message.sender.image || undefined} />
-                      <AvatarFallback>
-                        {message.sender.name?.charAt(0).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
+                    <div className='flex-shrink-0 w-8 h-8'>
+                      {showAvatar ? (
+                        <Avatar className='h-8 w-8'>
+                          <AvatarImage
+                            src={message.sender.image || undefined}
+                          />
+                          <AvatarFallback>
+                            {message.sender.name?.charAt(0).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                      ) : (
+                        <div className='w-8' />
+                      )}
+                    </div>
                   )}
+
                   <div
                     className={`flex flex-col ${
                       isCurrentUser ? 'items-end' : 'items-start'
-                    } max-w-[70%]`}
+                    } max-w-xs lg:max-w-md gap-1`}
                   >
-                    {!isCurrentUser && (
-                      <span className='text-xs text-muted-foreground mb-1'>
+                    {showAvatar && !isCurrentUser && (
+                      <span className='text-xs font-medium text-muted-foreground px-3 mb-0.5'>
                         {message.sender.name}
                       </span>
                     )}
@@ -406,86 +470,128 @@ export function ChatArea({ conversationId, currentUser }: ChatAreaProps) {
                         onCancel={() => setEditingMessageId(null)}
                       />
                     ) : (
-                      <div className='flex gap-2 items-start'>
-                        <div
-                          className={`rounded-2xl px-4 py-2 ${
-                            isCurrentUser
-                              ? 'bg-primary text-primary-foreground'
-                              : 'bg-muted'
-                          } ${isDeleted ? 'italic opacity-50' : ''}`}
-                        >
-                          {/* Display quoted message if exists */}
-                          {message.quotedMessage && !isDeleted && (
-                            <QuotedMessageDisplay
-                              quotedMessage={message.quotedMessage}
-                            />
-                          )}
+                      <div
+                        className={`rounded-2xl px-4 py-2.5 ${
+                          isCurrentUser
+                            ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-md hover:shadow-lg'
+                            : 'bg-slate-100 dark:bg-slate-800 text-foreground shadow-sm hover:shadow-md'
+                        } transition-all ${
+                          isDeleted ? 'italic opacity-60' : ''
+                        }`}
+                      >
+                        {message.quotedMessage && !isDeleted && (
+                          <QuotedMessageDisplay
+                            quotedMessage={message.quotedMessage}
+                          />
+                        )}
 
-                          {hasFile && !isDeleted && (
-                            <div className='mb-2'>
-                              {message.fileType?.startsWith('image/') ? (
-                                <img
-                                  src={message.fileUrl || ''}
-                                  alt={message.fileName || ''}
-                                  className='max-w-full rounded-lg mb-2'
-                                />
-                              ) : (
-                                <div className='flex items-center gap-2 p-2 bg-background/10 rounded-lg mb-2'>
-                                  <FileIcon className='h-5 w-5' />
-                                  <span className='text-sm flex-1'>
-                                    {message.fileName}
-                                  </span>
-                                  <Button
-                                    variant='ghost'
-                                    size='icon'
-                                    className='h-6 w-6 p-0'
-                                  >
-                                    <Download className='h-3 w-3' />
-                                  </Button>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                          <p className='text-sm'>{message.content}</p>
-                        </div>
-
-                        {!isDeleted && (
-                          <div className='flex gap-1'>
-                            <MessageReplyButton
-                              onReply={() => handleReplyClick(message)}
-                            />
-                            <MessageContextMenu
-                              message={message}
-                              currentUser={currentUser}
-                              onEdit={handleEditMessage}
-                              onDelete={handleDeleteMessage}
-                              isEditing={isEditing}
-                            />
+                        {hasFile && !isDeleted && (
+                          <div className='mb-2'>
+                            {message.fileType?.startsWith('image/') ? (
+                              <img
+                                src={message.fileUrl || ''}
+                                alt={message.fileName || ''}
+                                className='max-w-full max-h-64 rounded-lg mb-2'
+                              />
+                            ) : (
+                              <div className='flex items-center gap-2 p-2 bg-white/10 dark:bg-black/20 rounded-lg mb-2'>
+                                <FileIcon className='h-5 w-5 flex-shrink-0' />
+                                <span className='text-sm flex-1 truncate'>
+                                  {message.fileName}
+                                </span>
+                                <Button
+                                  variant='ghost'
+                                  size='icon'
+                                  className='h-6 w-6 p-0'
+                                >
+                                  <Download className='h-3 w-3' />
+                                </Button>
+                              </div>
+                            )}
                           </div>
                         )}
+                        <p className='text-sm leading-relaxed break-words'>
+                          {message.content}
+                        </p>
                       </div>
                     )}
 
                     {!isDeleted && (
-                      <div className='mt-2'>
-                        <MessageReactions
-                          messageId={message.id}
-                          conversationId={conversationId}
-                          reactions={message.reactions || {}}
-                          onReactionAdded={updatedReactions => {
-                            setMessages(prev =>
-                              prev.map(m =>
-                                m.id === message.id
-                                  ? { ...m, reactions: updatedReactions }
-                                  : m,
-                              ),
-                            );
-                          }}
+                      <MessageReactions
+                        messageId={message.id}
+                        conversationId={conversationId}
+                        reactions={message.reactions || {}}
+                        onReactionAdded={updatedReactions => {
+                          setMessages(prev =>
+                            prev.map(m =>
+                              m.id === message.id
+                                ? { ...m, reactions: updatedReactions }
+                                : m,
+                            ),
+                          );
+                        }}
+                      />
+                    )}
+
+                    {hoveredMessageId === message.id && !isDeleted && (
+                      <div
+                        className={`flex gap-1 items-center mt-1.5 ${
+                          isCurrentUser ? 'justify-end' : 'justify-start'
+                        }`}
+                      >
+                        <div className='relative'>
+                          <Button
+                            variant='ghost'
+                            size='icon'
+                            className='h-7 w-7'
+                            onClick={() =>
+                              setShowEmojiPicker(
+                                showEmojiPicker === message.id
+                                  ? null
+                                  : message.id,
+                              )
+                            }
+                          >
+                            <Smile className='h-3.5 w-3.5' />
+                          </Button>
+                          {showEmojiPicker === message.id && (
+                            <div
+                              className={`absolute top-full mt-2 ${
+                                isCurrentUser ? 'right-0' : 'left-0'
+                              } bg-card border border-border rounded-lg p-2 shadow-lg flex gap-1 z-50`}
+                            >
+                              {QUICK_REACTIONS.map(emoji => (
+                                <button
+                                  key={emoji}
+                                  onClick={() =>
+                                    handleQuickReaction(message.id, emoji)
+                                  }
+                                  className='text-xl hover:scale-125 transition-transform hover:bg-accent p-1 rounded'
+                                >
+                                  {emoji}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <MessageReplyButton
+                          onReply={() => handleReplyClick(message)}
+                        />
+                        <MessageContextMenu
+                          message={message}
+                          currentUser={currentUser}
+                          onEdit={handleEditMessage}
+                          onDelete={handleDeleteMessage}
+                          isEditing={isEditing}
                         />
                       </div>
                     )}
 
-                    <div className='flex gap-2 text-xs text-muted-foreground mt-1'>
+                    <div
+                      className={`flex gap-2 text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity ${
+                        isCurrentUser ? 'flex-row-reverse' : ''
+                      }`}
+                    >
                       <span>
                         {new Date(message.createdAt).toLocaleTimeString([], {
                           hour: '2-digit',
@@ -503,8 +609,7 @@ export function ChatArea({ conversationId, currentUser }: ChatAreaProps) {
       </ScrollArea>
 
       {/* Message Input */}
-      <div className='border-t border-border p-4 bg-card'>
-        {/* Quoted Message Preview */}
+      <div className='border-t border-border/50 p-4 bg-card/50 backdrop-blur-sm'>
         {quotedMessage && (
           <QuotedMessagePreview
             quotedMessage={quotedMessage}
@@ -518,24 +623,24 @@ export function ChatArea({ conversationId, currentUser }: ChatAreaProps) {
               type='button'
               variant='ghost'
               size='icon'
-              className='flex-shrink-0'
+              className='flex-shrink-0 hover:bg-accent'
             >
               <Paperclip className='h-5 w-5' />
             </Button>
           </FileUploadDialog>
-          <div className='flex-1 relative'>
+          <div className='flex-1'>
             <Input
               placeholder='Type a message...'
               value={newMessage}
               onChange={handleInputChange}
-              className='pr-4'
+              className='rounded-full px-4 bg-muted/50 border-border/50 focus-visible:ring-primary/50'
             />
           </div>
           <Button
             type='submit'
             size='icon'
             disabled={!newMessage.trim()}
-            className='flex-shrink-0'
+            className='flex-shrink-0 rounded-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700'
           >
             <Send className='h-4 w-4' />
           </Button>
