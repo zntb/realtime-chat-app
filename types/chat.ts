@@ -65,3 +65,15 @@ export interface TypingStatus {
   userId: string;
   isTyping: boolean;
 }
+
+export interface UserPresence {
+  userId: string;
+  status: 'online' | 'offline' | 'away';
+  lastSeen?: Date;
+}
+
+export interface PresenceStatus {
+  conversationId: string;
+  userId: string;
+  status: 'online' | 'offline' | 'away';
+}

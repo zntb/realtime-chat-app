@@ -8,11 +8,12 @@ interface WebSocketClient extends WebSocket {
 }
 
 interface WebSocketMessage {
-  type: 'message' | 'typing' | 'join' | 'leave';
+  type: 'message' | 'typing' | 'join' | 'leave' | 'reaction' | 'presence';
   conversationId: string;
   userId: string;
   content?: string;
   data?: any;
+  status?: 'online' | 'offline' | 'away';
 }
 
 const clients = new Map<string, WebSocketClient>();
@@ -56,6 +57,12 @@ export function createWebSocketServer(port = 3001) {
           case 'typing':
             handleTyping(message);
             break;
+          case 'reaction':
+            handleReaction(message);
+            break;
+          case 'presence':
+            handlePresence(message);
+            break;
           case 'leave':
             handleLeave(ws, message);
             break;
@@ -75,6 +82,25 @@ export function createWebSocketServer(port = 3001) {
         reason.toString(),
       );
       if (ws.userId) {
+        // Broadcast offline status to all conversations the user was in
+        ws.conversationIds?.forEach(conversationId => {
+          clients.forEach(client => {
+            if (
+              client.userId !== ws.userId &&
+              client.conversationIds?.has(conversationId) &&
+              client.readyState === WebSocket.OPEN
+            ) {
+              client.send(
+                JSON.stringify({
+                  type: 'presence',
+                  conversationId,
+                  userId: ws.userId,
+                  status: 'offline',
+                }),
+              );
+            }
+          });
+        });
         clients.delete(ws.userId);
         console.log(
           '[ChatFlow] Removed user:',
@@ -112,6 +138,24 @@ export function createWebSocketServer(port = 3001) {
     ws.conversationIds = ws.conversationIds || new Set();
     ws.conversationIds.add(message.conversationId);
     clients.set(message.userId, ws);
+
+    // Send current online status of other users in this conversation to the new user
+    clients.forEach(client => {
+      if (
+        client.userId !== message.userId &&
+        client.conversationIds?.has(message.conversationId) &&
+        client.readyState === WebSocket.OPEN
+      ) {
+        ws.send(
+          JSON.stringify({
+            type: 'presence',
+            conversationId: message.conversationId,
+            userId: client.userId,
+            status: 'online', // Assume online if connected
+          }),
+        );
+      }
+    });
 
     console.log(
       `[ChatFlow] User ${message.userId} joined conversation ${message.conversationId}`,
@@ -164,6 +208,48 @@ export function createWebSocketServer(port = 3001) {
     console.log(
       `[ChatFlow] User ${message.userId} left conversation ${message.conversationId}`,
     );
+  }
+
+  function handleReaction(message: WebSocketMessage) {
+    // Broadcast reaction to all clients in the conversation
+    clients.forEach(client => {
+      if (
+        client.conversationIds?.has(message.conversationId) &&
+        client.readyState === WebSocket.OPEN
+      ) {
+        client.send(
+          JSON.stringify({
+            type: 'reaction',
+            conversationId: message.conversationId,
+            messageId: message.data?.messageId,
+            emoji: message.data?.emoji,
+            userId: message.userId,
+            reactions: message.data?.reactions,
+            timestamp: new Date().toISOString(),
+          }),
+        );
+      }
+    });
+  }
+
+  function handlePresence(message: WebSocketMessage) {
+    // Broadcast presence status to all clients in the conversation except sender
+    clients.forEach(client => {
+      if (
+        client.userId !== message.userId &&
+        client.conversationIds?.has(message.conversationId) &&
+        client.readyState === WebSocket.OPEN
+      ) {
+        client.send(
+          JSON.stringify({
+            type: 'presence',
+            conversationId: message.conversationId,
+            userId: message.userId,
+            status: message.status || 'offline',
+          }),
+        );
+      }
+    });
   }
 
   console.log(`[ChatFlow] WebSocket server running on ws://localhost:${port}`);

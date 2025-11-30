@@ -1,15 +1,17 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import type { Message, TypingStatus } from '@/types/chat';
+import type { Message, TypingStatus, PresenceStatus } from '@/types/chat';
 
 type MessageHandler = (message: Message) => void;
 type TypingHandler = (status: TypingStatus) => void;
 type ReactionHandler = (data: any) => void;
+type PresenceHandler = (status: PresenceStatus) => void;
 
 export class WebSocketClient {
   private ws: WebSocket | null = null;
   private messageHandlers: Set<MessageHandler> = new Set();
   private typingHandlers: Set<TypingHandler> = new Set();
   private reactionHandlers: Set<ReactionHandler> = new Set();
+  private presenceHandlers: Set<PresenceHandler> = new Set();
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private reconnectDelay = 1000;
@@ -63,6 +65,11 @@ export class WebSocketClient {
               createdAt: new Date(data.timestamp),
               updatedAt: new Date(data.timestamp),
               isEdited: false,
+              isPinned: false,
+              deletedAt: null,
+              reactions: {},
+              quotedMessage: null,
+              quotedMessageId: null,
             };
             this.messageHandlers.forEach(handler => handler(message));
           } else if (data.type === 'typing') {
@@ -74,6 +81,13 @@ export class WebSocketClient {
             this.typingHandlers.forEach(handler => handler(status));
           } else if (data.type === 'reaction') {
             this.reactionHandlers.forEach(handler => handler(data));
+          } else if (data.type === 'presence') {
+            const status: PresenceStatus = {
+              conversationId: data.conversationId,
+              userId: data.userId,
+              status: data.status,
+            };
+            this.presenceHandlers.forEach(handler => handler(status));
           }
         } catch (error) {
           console.error('[ChatFlow] Error parsing WebSocket message:', error);
@@ -191,6 +205,19 @@ export class WebSocketClient {
     });
   }
 
+  sendPresenceStatus(
+    conversationId: string,
+    userId: string,
+    status: 'online' | 'offline' | 'away',
+  ) {
+    this.send({
+      type: 'presence',
+      conversationId,
+      userId,
+      status,
+    });
+  }
+
   onMessage(handler: MessageHandler) {
     this.messageHandlers.add(handler);
     return () => this.messageHandlers.delete(handler);
@@ -218,6 +245,11 @@ export class WebSocketClient {
   onTyping(handler: TypingHandler) {
     this.typingHandlers.add(handler);
     return () => this.typingHandlers.delete(handler);
+  }
+
+  onPresence(handler: PresenceHandler) {
+    this.presenceHandlers.add(handler);
+    return () => this.presenceHandlers.delete(handler);
   }
 
   private send(data: any) {

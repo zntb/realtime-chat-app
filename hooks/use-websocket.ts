@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { WebSocketSingleton } from '@/lib/websocket-singleton';
 import { WebSocketClient } from '@/lib/websocket-client';
-import type { Message, TypingStatus } from '@/types/chat';
+import type { Message, TypingStatus, PresenceStatus } from '@/types/chat';
 
 export function useWebSocket(userId: string | undefined) {
   const wsClient = useRef<WebSocketClient | null>(null);
@@ -47,6 +47,27 @@ export function useWebSocket(userId: string | undefined) {
     }
   };
 
+  const sendPresenceStatus = (
+    conversationId: string,
+    status: 'online' | 'offline' | 'away',
+  ) => {
+    if (userId) {
+      wsClient.current?.sendPresenceStatus(conversationId, userId, status);
+    }
+  };
+
+  const markAsOnline = (conversationId: string) => {
+    if (userId) {
+      wsClient.current?.sendPresenceStatus(conversationId, userId, 'online');
+    }
+  };
+
+  const markAsAway = (conversationId: string) => {
+    if (userId) {
+      wsClient.current?.sendPresenceStatus(conversationId, userId, 'away');
+    }
+  };
+
   const onMessage = (handler: (message: Message) => void) => {
     return wsClient.current?.onMessage(handler);
   };
@@ -59,14 +80,22 @@ export function useWebSocket(userId: string | undefined) {
     return wsClient.current?.onReaction(handler);
   };
 
+  const onPresence = (handler: (status: PresenceStatus) => void) => {
+    return wsClient.current?.onPresence(handler);
+  };
+
   return {
     isConnected,
     joinConversation,
     leaveConversation,
     sendMessage,
     sendTypingStatus,
+    sendPresenceStatus,
+    markAsOnline,
+    markAsAway,
     onMessage,
     onTyping,
     onReaction,
+    onPresence,
   };
 }

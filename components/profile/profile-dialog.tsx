@@ -55,7 +55,7 @@ export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
   const [formData, setFormData] = useState({
     name: '',
     bio: '',
-    status: 'OFFLINE' as UserProfile['status'],
+    status: 'ONLINE' as UserProfile['status'], // Default to ONLINE instead of OFFLINE
   });
 
   // Load profile when dialog opens
@@ -63,6 +63,17 @@ export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
     if (open && session?.user?.id) {
       fetchProfile();
     }
+  }, [open, session?.user?.id]);
+
+  // Auto-refresh profile data every 30 seconds to get updated status
+  useEffect(() => {
+    if (!open || !session?.user?.id) return;
+
+    const interval = setInterval(() => {
+      fetchProfile();
+    }, 30000); // Refresh every 30 seconds
+
+    return () => clearInterval(interval);
   }, [open, session?.user?.id]);
 
   const fetchProfile = async () => {
@@ -75,7 +86,7 @@ export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
         setFormData({
           name: data.name || '',
           bio: data.bio || '',
-          status: data.status || 'OFFLINE',
+          status: data.status || 'ONLINE',
         });
       }
     } catch (error) {
