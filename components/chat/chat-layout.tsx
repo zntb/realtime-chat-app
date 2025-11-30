@@ -34,7 +34,7 @@ export function ChatLayout() {
   }
 
   return (
-    <div className='h-screen flex overflow-hidden bg-background'>
+    <div className='h-dvh flex bg-background chat-container'>
       <ConversationSidebar
         selectedConversationId={selectedConversationId}
         onSelectConversation={setSelectedConversationId}

@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { WebSocketClient } from './websocket-client';
 
 class WebSocketSingleton {

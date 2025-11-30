@@ -476,3 +476,63 @@ textarea:focus-visible {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Chat layout improvements */
+.chat-container {
+  height: 100vh;
+  height: 100dvh; /* Dynamic viewport height for mobile */
+  overflow: hidden;
+}
+
+.chat-messages-area {
+  flex: 1;
+  min-height: 0; /* Important for flex items that should scroll */
+  overflow: hidden;
+}
+
+.chat-input-area {
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(8px);
+  border-top: 1px solid rgba(59, 130, 246, 0.1);
+  padding-bottom: env(safe-area-inset-bottom, 16px); /* Safe area for mobile */
+}
+
+.dark .chat-input-area {
+  background: rgba(15, 23, 42, 0.95);
+  border-top: 1px solid rgba(59, 130, 246, 0.1);
+}
+
+/* Mobile-specific improvements */
+@media (max-width: 768px) {
+  .chat-container {
+    height: 100vh;
+    height: 100dvh;
+  }
+
+  .chat-input-area {
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .chat-messages-area {
+    padding: 16px 12px;
+  }
+}
+
+/* Ensure input is always accessible */
+.message-input-container {
+  position: relative;
+  z-index: 10;
+}
+
+/* Improve scroll behavior */
+.scroll-smooth {
+  scroll-behavior: smooth;
+}
+
+/* Fix for iOS Safari viewport issues */
+@supports (-webkit-touch-callout: none) {
+  .chat-container {
+    height: -webkit-fill-available;
+  }
+}

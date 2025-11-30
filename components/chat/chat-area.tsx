@@ -349,9 +349,9 @@ export function ChatArea({ conversationId, currentUser }: ChatAreaProps) {
   }
 
   return (
-    <div className='flex-1 flex flex-col bg-background'>
+    <div className='flex-1 flex flex-col h-full bg-background chat-messages-area'>
       {/* Chat Header */}
-      <div className='h-16 border-b border-border/50 flex items-center justify-between px-6 bg-card/50 backdrop-blur-sm'>
+      <div className='h-16 border-b border-border/50 flex items-center justify-between px-6 bg-card/50 backdrop-blur-sm flex-shrink-0'>
         <div className='flex items-center gap-3'>
           <Avatar className='h-10 w-10 ring-2 ring-primary/20'>
             <AvatarImage src={'/file.svg'} />
@@ -395,7 +395,7 @@ export function ChatArea({ conversationId, currentUser }: ChatAreaProps) {
       </div>
 
       {/* Messages Area */}
-      <ScrollArea className='flex-1 p-6' ref={scrollRef}>
+      <ScrollArea className='flex-1 min-h-0 p-6 scroll-smooth' ref={scrollRef}>
         <div className='space-y-3 max-w-4xl mx-auto'>
           {isLoadingMessages ? (
             <div className='flex items-center justify-center py-12'>
@@ -533,7 +533,7 @@ export function ChatArea({ conversationId, currentUser }: ChatAreaProps) {
                       />
                     )}
 
-                    {hoveredMessageId === message.id && !isDeleted && (
+                    {!isDeleted && (
                       <div
                         className={`flex gap-1 items-center mt-1.5 ${
                           isCurrentUser ? 'justify-end' : 'justify-start'
@@ -588,7 +588,7 @@ export function ChatArea({ conversationId, currentUser }: ChatAreaProps) {
                     )}
 
                     <div
-                      className={`flex gap-2 text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity ${
+                      className={`flex gap-2 text-xs text-muted-foreground ${
                         isCurrentUser ? 'flex-row-reverse' : ''
                       }`}
                     >
@@ -609,7 +609,7 @@ export function ChatArea({ conversationId, currentUser }: ChatAreaProps) {
       </ScrollArea>
 
       {/* Message Input */}
-      <div className='border-t border-border/50 p-4 bg-card/50 backdrop-blur-sm'>
+      <div className='border-t border-border/50 p-4 bg-card/50 backdrop-blur-sm flex-shrink-0 chat-input-area'>
         {quotedMessage && (
           <QuotedMessagePreview
             quotedMessage={quotedMessage}
@@ -617,7 +617,10 @@ export function ChatArea({ conversationId, currentUser }: ChatAreaProps) {
           />
         )}
 
-        <form onSubmit={handleSendMessage} className='flex items-end gap-2'>
+        <form
+          onSubmit={handleSendMessage}
+          className='flex items-end gap-2 mb-4'
+        >
           <FileUploadDialog onUpload={handleFileUpload}>
             <Button
               type='button'
