@@ -18,16 +18,34 @@ interface WebSocketMessage {
 const clients = new Map<string, WebSocketClient>();
 
 export function createWebSocketServer(port = 3001) {
-  const wss = new WebSocketServer({ port });
+  const wss = new WebSocketServer({
+    port,
+    host: '0.0.0.0', // Explicitly bind to all interfaces
+    perMessageDeflate: false, // Disable compression for debugging
+  });
+
+  wss.on('listening', () => {
+    console.log('[ChatFlow] WebSocket server is now listening');
+    console.log('[ChatFlow] Server address:', wss.address());
+    console.log('[ChatFlow] Ready for connections on ws://localhost:' + port);
+  });
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   wss.on('connection', (ws: WebSocketClient, req: IncomingMessage) => {
-    console.log('[ChatFlow] New WebSocket connection');
+    console.log('[ChatFlow] New WebSocket connection established');
+    console.log('[ChatFlow] Connection from:', req.socket.remoteAddress);
+    console.log('[ChatFlow] User-Agent:', req.headers['user-agent']);
+    console.log('[ChatFlow] Current connected clients:', clients.size + 1);
 
     ws.on('message', (data: Buffer) => {
       try {
         const message: WebSocketMessage = JSON.parse(data.toString());
-        console.log('[ChatFlow] Received message:', message.type);
+        console.log(
+          '[ChatFlow] Received message:',
+          message.type,
+          'from user:',
+          message.userId,
+        );
 
         switch (message.type) {
           case 'join':
@@ -42,22 +60,52 @@ export function createWebSocketServer(port = 3001) {
           case 'leave':
             handleLeave(ws, message);
             break;
+          default:
+            console.log('[ChatFlow] Unknown message type:', message.type);
         }
       } catch (error) {
         console.error('[ChatFlow] Error parsing message:', error);
       }
     });
 
-    ws.on('close', () => {
-      console.log('[ChatFlow] Client disconnected');
+    ws.on('close', (code, reason) => {
+      console.log(
+        '[ChatFlow] Client disconnected with code:',
+        code,
+        'reason:',
+        reason.toString(),
+      );
       if (ws.userId) {
         clients.delete(ws.userId);
+        console.log(
+          '[ChatFlow] Removed user:',
+          ws.userId,
+          'Total clients:',
+          clients.size,
+        );
       }
     });
 
     ws.on('error', error => {
       console.error('[ChatFlow] WebSocket error:', error);
     });
+
+    ws.on('pong', () => {
+      console.log('[ChatFlow] Received pong from client');
+    });
+
+    // Send a welcome message
+    ws.send(
+      JSON.stringify({
+        type: 'welcome',
+        message: 'Connected to ChatFlow WebSocket server',
+        timestamp: new Date().toISOString(),
+      }),
+    );
+  });
+
+  wss.on('error', error => {
+    console.error('[ChatFlow] WebSocket Server error:', error);
   });
 
   function handleJoin(ws: WebSocketClient, message: WebSocketMessage) {

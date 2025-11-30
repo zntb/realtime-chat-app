@@ -24,10 +24,26 @@ export class WebSocketClient {
         return;
       }
 
+      console.log('[ChatFlow] Attempting to connect to WebSocket:', this.url);
+
       this.ws = new WebSocket(this.url);
 
+      // Connection timeout
+      const connectionTimeout = setTimeout(() => {
+        if (this.ws?.readyState === WebSocket.CONNECTING) {
+          console.error(
+            '[ChatFlow] WebSocket connection timeout after 5 seconds',
+          );
+          console.error('[ChatFlow] Current readyState:', this.ws?.readyState);
+          this.ws.close();
+        }
+      }, 5000);
+
       this.ws.onopen = () => {
-        console.log('[ChatFlow] WebSocket connected');
+        clearTimeout(connectionTimeout);
+        console.log('[ChatFlow] WebSocket connected successfully');
+        console.log('[ChatFlow] WebSocket URL:', this.url);
+        console.log('[ChatFlow] Connection readyState:', this.ws?.readyState);
         this.reconnectAttempts = 0;
       };
       this.ws.onmessage = event => {
@@ -35,7 +51,9 @@ export class WebSocketClient {
           const data = JSON.parse(event.data);
           console.log('[ChatFlow] Received WebSocket message:', data.type);
 
-          if (data.type === 'message') {
+          if (data.type === 'welcome') {
+            console.log('[ChatFlow] Server welcome message:', data.message);
+          } else if (data.type === 'message') {
             const message: Message = {
               id: data.data?.id || `temp-${Date.now()}`,
               content: data.content,
@@ -63,46 +81,55 @@ export class WebSocketClient {
       };
 
       this.ws.onerror = ev => {
-        // Browser gives an Event — log it and any nested error if present
+        clearTimeout(connectionTimeout);
         console.error('[ChatFlow] WebSocket error event:', ev);
-        // Sometimes the underlying error is on ev (non-standard); attempt to log any property
-        try {
-          const maybeError = (ev as any).error ?? (ev as any).reason;
-          if (maybeError)
-            console.error('[ChatFlow] Underlying error:', maybeError);
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        } catch (e) {
-          // ignore
+        console.error(
+          '[ChatFlow] WebSocket readyState when error occurred:',
+          this.ws?.readyState,
+        );
+        console.error('[ChatFlow] WebSocket URL that failed:', this.url);
+
+        // Check for specific error types
+        if (this.ws?.readyState === WebSocket.CONNECTING) {
+          console.error('[ChatFlow] Error occurred during connection attempt');
         }
+
         console.warn(
-          '[ChatFlow] Make sure the WebSocket server is running on ' + this.url,
+          '[ChatFlow] TROUBLESHOOTING STEPS:',
+          '1. Make sure the WebSocket server is running: npm run ws',
+          '2. Check if server is listening on port 3001',
+          '3. Verify the WebSocket URL is correct:',
+          '   Current URL:',
+          this.url,
+          '   Expected URL: ws://localhost:3001',
+          '4. Check browser network tab for connection errors',
+          '5. Try accessing ws://localhost:3001 directly in browser',
         );
       };
 
       this.ws.onclose = (ev: CloseEvent) => {
+        clearTimeout(connectionTimeout);
         console.log(
           '[ChatFlow] WebSocket disconnected',
           'code=' + ev.code,
           'reason=' + (ev.reason || '<none>'),
           'wasClean=' + ev.wasClean,
+          'readyState=' + (ev.target as WebSocket)?.readyState,
         );
-        // attempt reconnect after logging close details
-        this.attemptReconnect(userId);
-      };
 
-      this.ws.onerror = error => {
-        console.error(
-          '[ChatFlow] WebSocket error:',
-          error instanceof Error ? error.message : 'Unknown error',
-        );
-        console.warn(
-          '[ChatFlow] Make sure the WebSocket server is running on ' + this.url,
-        );
+        // Only attempt reconnect if it wasn't a clean close
+        if (!ev.wasClean) {
+          this.attemptReconnect(userId);
+        }
       };
     } catch (error) {
       console.error(
-        '[ChatFlow] Error connecting to WebSocket:',
+        '[ChatFlow] Error creating WebSocket connection:',
         error instanceof Error ? error.message : error,
+      );
+      console.error('[ChatFlow] Failed URL:', this.url);
+      console.error(
+        '[ChatFlow] Check if WebSocket server is running with: npm run ws',
       );
     }
   }

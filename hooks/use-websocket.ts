@@ -2,6 +2,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { WebSocketSingleton } from '@/lib/websocket-singleton';
 import { WebSocketClient } from '@/lib/websocket-client';
 import type { Message, TypingStatus } from '@/types/chat';
 
@@ -12,13 +13,12 @@ export function useWebSocket(userId: string | undefined) {
   useEffect(() => {
     if (!userId) return;
 
-    const wsUrl = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3001';
-    wsClient.current = new WebSocketClient(wsUrl);
-    wsClient.current.connect(userId);
+    // Use singleton to ensure only one WebSocket instance exists
+    wsClient.current = WebSocketSingleton.getInstance(userId);
     setIsConnected(true);
 
     return () => {
-      wsClient.current?.disconnect();
+      // Don't disconnect here - let singleton manage lifecycle
       setIsConnected(false);
     };
   }, [userId]);
