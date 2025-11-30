@@ -4,6 +4,7 @@ import { useSession } from '@/lib/auth-client';
 interface UserStatus {
   id: string;
   status: 'ONLINE' | 'OFFLINE' | 'AWAY' | 'BUSY' | 'DO_NOT_DISTURB';
+  lastActive?: string;
 }
 
 export function useUserStatus() {
@@ -23,6 +24,7 @@ export function useUserStatus() {
         const newStatus = {
           id: data.id,
           status: data.status || 'ONLINE', // Default to ONLINE if no status
+          lastActive: data.lastActive,
         };
         setUserStatus(newStatus);
         return newStatus;
@@ -33,6 +35,7 @@ export function useUserStatus() {
       setUserStatus({
         id: session.user.id,
         status: 'ONLINE',
+        lastActive: new Date().toISOString(),
       });
     } finally {
       setIsLoading(false);
@@ -73,12 +76,14 @@ export function useUserStatus() {
         updateUserStatus('ONLINE');
       });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.user?.id]);
 
   // Auto-refresh status every 30 seconds
   useEffect(() => {
     const interval = setInterval(fetchUserStatus, 30000);
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.user?.id]);
 
   // Auto-set user online when window is focused/active
@@ -102,6 +107,7 @@ export function useUserStatus() {
       window.removeEventListener('focus', handleFocus);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.user?.id]);
 
   return {

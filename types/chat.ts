@@ -5,6 +5,7 @@ export interface User {
   email: string;
   name: string | null;
   image?: string | null;
+  lastActive?: string;
 }
 
 export interface ReactionData {
