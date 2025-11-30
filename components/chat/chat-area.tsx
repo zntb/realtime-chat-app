@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import type { Message, User, QuotedMessage } from '@/types/chat';
 import { useWebSocket } from '@/hooks/use-websocket';
+import { useUserStatus } from '@/hooks/use-user-status';
 import { FileUploadDialog } from './file-upload-dialog';
 import { MessageContextMenu } from './message-context-menu';
 import { MessageEditInput } from './message-edit-input';
@@ -49,10 +50,15 @@ export function ChatArea({ conversationId, currentUser }: ChatAreaProps) {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState<string | null>(null);
+  const [otherUserStatus, setOtherUserStatus] = useState<
+    'online' | 'offline' | 'away'
+  >('offline');
   const scrollRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const awayTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const ws = useWebSocket(currentUser.id);
+  const { updateUserStatus, userStatus } = useUserStatus();
 
   const fetchMessages = async () => {
     if (!conversationId) return;
@@ -123,6 +129,124 @@ export function ChatArea({ conversationId, currentUser }: ChatAreaProps) {
       }, 0);
     }
   }, [messages]);
+
+  // Presence tracking - separate effect to avoid dependency issues
+  useEffect(() => {
+    if (!conversationId) return;
+
+    const unsubscribePresence = ws.onPresence?.(status => {
+      if (
+        status.conversationId === conversationId &&
+        status.userId !== currentUser.id
+      ) {
+        setOtherUserStatus(status.status);
+      }
+    });
+
+    return () => {
+      unsubscribePresence?.();
+    };
+  }, [conversationId, currentUser.id]); // Remove ws and updateUserStatus from dependencies
+
+  // Convert presence status to user status
+  const getUserStatusFromPresence = (
+    presenceStatus: 'online' | 'offline' | 'away',
+  ) => {
+    switch (presenceStatus) {
+      case 'online':
+        return 'ONLINE' as const;
+      case 'away':
+        return 'AWAY' as const;
+      case 'offline':
+      default:
+        return 'OFFLINE' as const;
+    }
+  };
+
+  // Function to update user's status in database
+  const updateUserDatabaseStatus = (
+    presenceStatus: 'online' | 'offline' | 'away',
+  ) => {
+    const userStatus = getUserStatusFromPresence(presenceStatus);
+    updateUserStatus(userStatus);
+  };
+
+  // Mark user as online when active, away when inactive
+  useEffect(() => {
+    if (!conversationId) return;
+
+    let activityTimeout: NodeJS.Timeout | null = null;
+
+    const handleActivity = () => {
+      // Clear existing timeout
+      if (activityTimeout) {
+        clearTimeout(activityTimeout);
+      }
+
+      // Update WebSocket presence
+      ws.markAsOnline?.(conversationId);
+      updateUserDatabaseStatus('online');
+
+      // Set timeout to mark as away after 5 minutes of inactivity
+      activityTimeout = setTimeout(() => {
+        ws.markAsAway?.(conversationId);
+        updateUserDatabaseStatus('away');
+      }, 5 * 60 * 1000);
+    };
+
+    const handleInactivity = () => {
+      // Clear timeout and mark as away
+      if (activityTimeout) {
+        clearTimeout(activityTimeout);
+      }
+      ws.markAsAway?.(conversationId);
+      updateUserDatabaseStatus('away');
+    };
+
+    // Add event listeners for user activity
+    const eventOptions = { passive: true };
+    window.addEventListener('mousedown', handleActivity, eventOptions);
+    window.addEventListener('keydown', handleActivity, eventOptions);
+    window.addEventListener('scroll', handleActivity, eventOptions);
+    window.addEventListener(
+      'visibilitychange',
+      () => {
+        if (document.hidden) {
+          handleInactivity();
+        } else {
+          handleActivity();
+        }
+      },
+      eventOptions,
+    );
+
+    // Set user offline when page is about to unload
+    const handleBeforeUnload = () => {
+      updateUserDatabaseStatus('offline');
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    // Initial activity marking with debouncing
+    const initialTimeout = setTimeout(() => {
+      handleActivity();
+    }, 100);
+
+    return () => {
+      window.removeEventListener('mousedown', handleActivity);
+      window.removeEventListener('keydown', handleActivity);
+      window.removeEventListener('scroll', handleActivity);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('visibilitychange', handleActivity);
+
+      if (activityTimeout) {
+        clearTimeout(activityTimeout);
+      }
+      clearTimeout(initialTimeout);
+
+      // Update status to offline when component unmounts
+      updateUserDatabaseStatus('offline');
+    };
+  }, [conversationId]); // Remove ws from dependencies to prevent infinite loop
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setNewMessage(e.target.value);
@@ -393,8 +517,28 @@ export function ChatArea({ conversationId, currentUser }: ChatAreaProps) {
                 </span>
               ) : (
                 <div className='flex items-center gap-1'>
-                  <div className='w-2 h-2 rounded-full bg-green-500' />
-                  Online
+                  <div
+                    className={`w-2 h-2 rounded-full ${
+                      userStatus?.status === 'ONLINE'
+                        ? 'bg-green-500'
+                        : userStatus?.status === 'AWAY'
+                        ? 'bg-yellow-500'
+                        : userStatus?.status === 'BUSY'
+                        ? 'bg-red-500'
+                        : userStatus?.status === 'DO_NOT_DISTURB'
+                        ? 'bg-purple-500'
+                        : 'bg-gray-400'
+                    }`}
+                  />
+                  {userStatus?.status === 'ONLINE'
+                    ? 'Online'
+                    : userStatus?.status === 'AWAY'
+                    ? 'Away'
+                    : userStatus?.status === 'BUSY'
+                    ? 'Busy'
+                    : userStatus?.status === 'DO_NOT_DISTURB'
+                    ? 'Do Not Disturb'
+                    : 'Offline'}
                 </div>
               )}
             </div>
@@ -429,16 +573,16 @@ export function ChatArea({ conversationId, currentUser }: ChatAreaProps) {
               </p>
             </div>
           ) : (
-            // Sort messages: pinned first, then by creation time (newest first)
+            // Sort messages: pinned first, then by creation time (oldest first for chronological order)
             [...messages]
               .sort((a, b) => {
                 // Pinned messages come first
                 if (a.isPinned && !b.isPinned) return -1;
                 if (!a.isPinned && b.isPinned) return 1;
-                // If both are pinned or both are not pinned, sort by creation time (newest first)
+                // If both are pinned or both are not pinned, sort by creation time (oldest first)
                 return (
-                  new Date(b.createdAt).getTime() -
-                  new Date(a.createdAt).getTime()
+                  new Date(a.createdAt).getTime() -
+                  new Date(b.createdAt).getTime()
                 );
               })
               .map((message, index) => {

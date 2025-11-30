@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WebSocket Test</title>
+  </head>
+  <body>
+    <h1>WebSocket Connection Test</h1>
+    <div id="status">Connecting...</div>
+    <div id="messages"></div>
+    <script>
+      const statusDiv = document.getElementById('status');
+      const messagesDiv = document.getElementById('messages');
+
+      function log(message) {
+        messagesDiv.innerHTML += `<p>${new Date().toLocaleTimeString()}: ${message}</p>`;
+        console.log(message);
+      }
+
+      function updateStatus(status) {
+        statusDiv.textContent = status;
+        statusDiv.style.color = status.includes('Connected') ? 'green' : 'red';
+      }
+
+      log('Attempting to connect to WebSocket...');
+
+      const ws = new WebSocket('ws://localhost:3001');
+
+      ws.onopen = function () {
+        log('WebSocket connection opened successfully!');
+        updateStatus('Connected to WebSocket server');
+
+        // Send a test message
+        ws.send(
+          JSON.stringify({
+            type: 'join',
+            conversationId: 'test-conversation',
+            userId: 'test-user',
+          }),
+        );
+      };
+
+      ws.onmessage = function (event) {
+        log('Received message: ' + event.data);
+      };
+
+      ws.onclose = function (event) {
+        log(
+          'WebSocket connection closed. Code: ' +
+            event.code +
+            ', Reason: ' +
+            event.reason,
+        );
+        updateStatus('Disconnected from WebSocket server');
+      };
+
+      ws.onerror = function (error) {
+        log('WebSocket error: ' + error);
+        updateStatus('WebSocket error occurred');
+      };
+    </script>
+  </body>
+</html>
