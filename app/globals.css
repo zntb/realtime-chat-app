@@ -114,7 +114,8 @@
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border;
+    outline-color: rgb(59 130 246 / 0.5);
   }
   body {
     @apply bg-background text-foreground;
@@ -282,7 +283,7 @@
 
 /* Avatar styling */
 .avatar-ring {
-  ring: 2px rgb(59, 130, 246) / 0.2;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
 }
 
 /* File upload styling */
