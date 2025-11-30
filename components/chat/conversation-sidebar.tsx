@@ -5,12 +5,20 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { MessageSquare, Plus, Search, LogOut, Users } from 'lucide-react';
+import {
+  MessageSquare,
+  Plus,
+  Search,
+  LogOut,
+  Users,
+  Settings,
+} from 'lucide-react';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { signOut } from '@/lib/auth-client';
 import { useRouter } from 'next/navigation';
 import type { Conversation, User } from '@/types/chat';
 import { NewConversationDialog } from './new-conversation-dialog';
+import { ProfileDialog } from '@/components/profile/profile-dialog';
 
 interface ConversationSidebarProps {
   selectedConversationId: string | null;
@@ -27,6 +35,7 @@ export function ConversationSidebar({
   const [searchQuery, setSearchQuery] = useState('');
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false);
 
   // Fetch conversations on mount
   useEffect(() => {
@@ -93,12 +102,48 @@ export function ConversationSidebar({
             <Button
               variant='ghost'
               size='icon'
+              onClick={() => setIsProfileDialogOpen(true)}
+              title='Profile settings'
+            >
+              <Settings className='h-4 w-4' />
+            </Button>
+            <Button
+              variant='ghost'
+              size='icon'
               onClick={handleSignOut}
               title='Sign out'
             >
               <LogOut className='h-4 w-4' />
             </Button>
           </div>
+        </div>
+
+        {/* User Profile Section */}
+        <div className='flex items-center gap-3 p-3 rounded-lg bg-muted/50 mb-4'>
+          <Avatar className='h-10 w-10'>
+            <AvatarImage src={currentUser.image || undefined} />
+            <AvatarFallback>
+              {currentUser.name?.charAt(0).toUpperCase() ||
+                currentUser.email.charAt(0).toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+          <div className='flex-1 min-w-0'>
+            <p className='font-medium text-sm truncate'>
+              {currentUser.name || 'Unnamed User'}
+            </p>
+            <p className='text-xs text-muted-foreground truncate'>
+              {currentUser.email}
+            </p>
+          </div>
+          <Button
+            variant='ghost'
+            size='icon'
+            onClick={() => setIsProfileDialogOpen(true)}
+            className='h-8 w-8'
+            title='Edit profile'
+          >
+            <Settings className='h-4 w-4' />
+          </Button>
         </div>
 
         {/* Search */}
@@ -189,6 +234,12 @@ export function ConversationSidebar({
           </Button>
         </NewConversationDialog>
       </div>
+
+      {/* Profile Dialog */}
+      <ProfileDialog
+        open={isProfileDialogOpen}
+        onOpenChange={setIsProfileDialogOpen}
+      />
     </div>
   );
 }

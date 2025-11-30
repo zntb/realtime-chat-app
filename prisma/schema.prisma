@@ -12,6 +12,8 @@ model User {
   email         String   @unique
   name          String?
   image         String?
+  bio           String?  @db.Text
+  status        UserStatus @default(OFFLINE)
   emailVerified Boolean  @default(false)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -24,6 +26,14 @@ model User {
   reactions     MessageReaction[]
 
   @@map("users")
+}
+
+enum UserStatus {
+  ONLINE
+  OFFLINE
+  AWAY
+  BUSY
+  DO_NOT_DISTURB
 }
 
 model Account {
