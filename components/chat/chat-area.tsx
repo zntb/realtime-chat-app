@@ -45,6 +45,7 @@ export function ChatArea({ conversationId, currentUser }: ChatAreaProps) {
   const [quotedMessage, setQuotedMessage] = useState<QuotedMessage | null>(
     null,
   );
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
