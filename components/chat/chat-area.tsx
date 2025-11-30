@@ -381,7 +381,7 @@ export function ChatArea({ conversationId, currentUser }: ChatAreaProps) {
                 ? 'Project Team'
                 : 'Chat'}
             </h2>
-            <p className='text-xs text-muted-foreground'>
+            <div className='text-xs text-muted-foreground'>
               {isTyping ? (
                 <span className='flex items-center gap-1'>
                   typing
@@ -392,9 +392,12 @@ export function ChatArea({ conversationId, currentUser }: ChatAreaProps) {
                   </span>
                 </span>
               ) : (
-                'Online'
+                <div className='flex items-center gap-1'>
+                  <div className='w-2 h-2 rounded-full bg-green-500' />
+                  Online
+                </div>
               )}
-            </p>
+            </div>
           </div>
         </div>
         <div className='flex items-center gap-1'>
