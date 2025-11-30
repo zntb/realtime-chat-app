@@ -114,6 +114,8 @@ model Message {
   isEdited        Boolean   @default(false)
   editedAt        DateTime?
   quotedMessageId String?
+  isPinned        Boolean   @default(false)
+  pinnedAt        DateTime?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
@@ -126,6 +128,7 @@ model Message {
   @@index([conversationId])
   @@index([senderId])
   @@index([quotedMessageId]) // NEW
+  @@index([isPinned])
   @@map("messages")
 }
 

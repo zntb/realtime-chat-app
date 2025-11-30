@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Message, User } from '@/types/chat';
 import { Button } from '@/components/ui/button';
-import { MoreVertical, Edit2, Trash2, Copy } from 'lucide-react';
+import { MoreVertical, Edit2, Trash2, Copy, Pin, PinOff } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface MessageContextMenuProps {
@@ -11,6 +11,7 @@ interface MessageContextMenuProps {
   currentUser: User;
   onEdit: (message: Message) => void;
   onDelete: (messageId: string) => void;
+  onPinToggle: (messageId: string) => void;
   isEditing: boolean;
 }
 
@@ -19,6 +20,7 @@ export function MessageContextMenu({
   currentUser,
   onEdit,
   onDelete,
+  onPinToggle,
   isEditing,
 }: MessageContextMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -56,6 +58,27 @@ export function MessageContextMenu({
   const handleEdit = () => {
     onEdit(message);
     setIsOpen(false);
+  };
+
+  const handlePinToggle = async () => {
+    try {
+      const response = await fetch(
+        `/api/conversations/${message.conversationId}/messages/${message.id}/pin`,
+        { method: 'POST' },
+      );
+
+      if (!response.ok) {
+        toast.error('Failed to update pin status');
+        return;
+      }
+
+      onPinToggle(message.id);
+      toast.success(message.isPinned ? 'Message unpinned' : 'Message pinned');
+      setIsOpen(false);
+    } catch (error) {
+      toast.error('Failed to update pin status');
+      console.error('Pin toggle error:', error);
+    }
   };
 
   const handleDelete = async () => {
@@ -104,24 +127,40 @@ export function MessageContextMenu({
             Copy
           </button>
 
-          {isOwner && !isDeleted && (
+          {!isDeleted && (
             <>
-              <div className='h-px bg-border my-1' />
               <button
-                onClick={handleEdit}
-                disabled={isEditing}
-                className='flex items-center gap-2 px-4 py-2 text-sm hover:bg-accent w-full text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
+                onClick={handlePinToggle}
+                className='flex items-center gap-2 px-4 py-2 text-sm hover:bg-accent w-full text-left transition-colors'
               >
-                <Edit2 className='h-4 w-4' />
-                Edit
+                {message.isPinned ? (
+                  <PinOff className='h-4 w-4' />
+                ) : (
+                  <Pin className='h-4 w-4' />
+                )}
+                {message.isPinned ? 'Unpin' : 'Pin'}
               </button>
-              <button
-                onClick={handleDelete}
-                className='flex items-center gap-2 px-4 py-2 text-sm hover:bg-destructive/10 text-destructive w-full text-left transition-colors'
-              >
-                <Trash2 className='h-4 w-4' />
-                Delete
-              </button>
+
+              {isOwner && (
+                <>
+                  <div className='h-px bg-border my-1' />
+                  <button
+                    onClick={handleEdit}
+                    disabled={isEditing}
+                    className='flex items-center gap-2 px-4 py-2 text-sm hover:bg-accent w-full text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
+                  >
+                    <Edit2 className='h-4 w-4' />
+                    Edit
+                  </button>
+                  <button
+                    onClick={handleDelete}
+                    className='flex items-center gap-2 px-4 py-2 text-sm hover:bg-destructive/10 text-destructive w-full text-left transition-colors'
+                  >
+                    <Trash2 className='h-4 w-4' />
+                    Delete
+                  </button>
+                </>
+              )}
             </>
           )}
         </div>

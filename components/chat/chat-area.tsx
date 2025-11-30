@@ -17,6 +17,7 @@ import {
   FileIcon,
   Download,
   Smile,
+  Pin,
 } from 'lucide-react';
 import type { Message, User, QuotedMessage } from '@/types/chat';
 import { useWebSocket } from '@/hooks/use-websocket';
@@ -224,6 +225,20 @@ export function ChatArea({ conversationId, currentUser }: ChatAreaProps) {
     setEditingMessageId(null);
   };
 
+  const handlePinToggle = (messageId: string) => {
+    setMessages(prev =>
+      prev.map(msg =>
+        msg.id === messageId
+          ? {
+              ...msg,
+              isPinned: !msg.isPinned,
+              pinnedAt: !msg.isPinned ? new Date() : null,
+            }
+          : msg,
+      ),
+    );
+  };
+
   const handleDeleteMessage = (messageId: string) => {
     setMessages(prev =>
       prev.map(msg =>
@@ -411,200 +426,224 @@ export function ChatArea({ conversationId, currentUser }: ChatAreaProps) {
               </p>
             </div>
           ) : (
-            messages.map((message, index) => {
-              const isCurrentUser = message.senderId === currentUser.id;
-              const hasFile = message.fileUrl && message.fileName;
-              const isDeleted =
-                message.content === '[This message was deleted]';
-              const isEditing = editingMessageId === message.id;
-              const prevMessage = index > 0 ? messages[index - 1] : null;
-              const showAvatar =
-                !prevMessage ||
-                prevMessage.senderId !== message.senderId ||
-                new Date(message.createdAt).getTime() -
-                  new Date(prevMessage.createdAt).getTime() >
-                  60000;
+            // Sort messages: pinned first, then by creation time (newest first)
+            [...messages]
+              .sort((a, b) => {
+                // Pinned messages come first
+                if (a.isPinned && !b.isPinned) return -1;
+                if (!a.isPinned && b.isPinned) return 1;
+                // If both are pinned or both are not pinned, sort by creation time (newest first)
+                return (
+                  new Date(b.createdAt).getTime() -
+                  new Date(a.createdAt).getTime()
+                );
+              })
+              .map((message, index) => {
+                const isCurrentUser = message.senderId === currentUser.id;
+                const hasFile = message.fileUrl && message.fileName;
+                const isDeleted =
+                  message.content === '[This message was deleted]';
+                const isEditing = editingMessageId === message.id;
+                const prevMessage = index > 0 ? messages[index - 1] : null;
+                const showAvatar =
+                  !prevMessage ||
+                  prevMessage.senderId !== message.senderId ||
+                  new Date(message.createdAt).getTime() -
+                    new Date(prevMessage.createdAt).getTime() >
+                    60000;
 
-              return (
-                <div
-                  key={message.id}
-                  className={`flex gap-3 group ${
-                    isCurrentUser ? 'flex-row-reverse' : ''
-                  } animate-slide-up`}
-                  onMouseEnter={() => setHoveredMessageId(message.id)}
-                  onMouseLeave={() => setHoveredMessageId(null)}
-                >
-                  {!isCurrentUser && (
-                    <div className='flex-shrink-0 w-8 h-8'>
-                      {showAvatar ? (
-                        <Avatar className='h-8 w-8'>
-                          <AvatarImage
-                            src={message.sender.image || undefined}
-                          />
-                          <AvatarFallback>
-                            {message.sender.name?.charAt(0).toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                      ) : (
-                        <div className='w-8' />
-                      )}
-                    </div>
-                  )}
-
+                return (
                   <div
-                    className={`flex flex-col ${
-                      isCurrentUser ? 'items-end' : 'items-start'
-                    } max-w-xs lg:max-w-md gap-1`}
+                    key={message.id}
+                    className={`flex gap-3 group ${
+                      isCurrentUser ? 'flex-row-reverse' : ''
+                    } animate-slide-up`}
+                    onMouseEnter={() => setHoveredMessageId(message.id)}
+                    onMouseLeave={() => setHoveredMessageId(null)}
                   >
-                    {showAvatar && !isCurrentUser && (
-                      <span className='text-xs font-medium text-muted-foreground px-3 mb-0.5'>
-                        {message.sender.name}
-                      </span>
-                    )}
-
-                    {isEditing ? (
-                      <MessageEditInput
-                        messageId={message.id}
-                        conversationId={conversationId}
-                        initialContent={message.content}
-                        onSave={handleSaveEdit}
-                        onCancel={() => setEditingMessageId(null)}
-                      />
-                    ) : (
-                      <div
-                        className={`rounded-2xl px-4 py-2.5 ${
-                          isCurrentUser
-                            ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-md hover:shadow-lg'
-                            : 'bg-slate-100 dark:bg-slate-800 text-foreground shadow-sm hover:shadow-md'
-                        } transition-all ${
-                          isDeleted ? 'italic opacity-60' : ''
-                        }`}
-                      >
-                        {message.quotedMessage && !isDeleted && (
-                          <QuotedMessageDisplay
-                            quotedMessage={message.quotedMessage}
-                          />
+                    {!isCurrentUser && (
+                      <div className='flex-shrink-0 w-8 h-8'>
+                        {showAvatar ? (
+                          <Avatar className='h-8 w-8'>
+                            <AvatarImage
+                              src={message.sender.image || undefined}
+                            />
+                            <AvatarFallback>
+                              {message.sender.name?.charAt(0).toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                        ) : (
+                          <div className='w-8' />
                         )}
-
-                        {hasFile && !isDeleted && (
-                          <div className='mb-2'>
-                            {message.fileType?.startsWith('image/') ? (
-                              <img
-                                src={message.fileUrl || ''}
-                                alt={message.fileName || ''}
-                                className='max-w-full max-h-64 rounded-lg mb-2'
-                              />
-                            ) : (
-                              <div className='flex items-center gap-2 p-2 bg-white/10 dark:bg-black/20 rounded-lg mb-2'>
-                                <FileIcon className='h-5 w-5 flex-shrink-0' />
-                                <span className='text-sm flex-1 truncate'>
-                                  {message.fileName}
-                                </span>
-                                <Button
-                                  variant='ghost'
-                                  size='icon'
-                                  className='h-6 w-6 p-0'
-                                >
-                                  <Download className='h-3 w-3' />
-                                </Button>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                        <p className='text-sm leading-relaxed break-words'>
-                          {message.content}
-                        </p>
-                      </div>
-                    )}
-
-                    {!isDeleted && (
-                      <MessageReactions
-                        messageId={message.id}
-                        conversationId={conversationId}
-                        reactions={message.reactions || {}}
-                        onReactionAdded={updatedReactions => {
-                          setMessages(prev =>
-                            prev.map(m =>
-                              m.id === message.id
-                                ? { ...m, reactions: updatedReactions }
-                                : m,
-                            ),
-                          );
-                        }}
-                      />
-                    )}
-
-                    {!isDeleted && (
-                      <div
-                        className={`flex gap-1 items-center mt-1.5 ${
-                          isCurrentUser ? 'justify-end' : 'justify-start'
-                        }`}
-                      >
-                        <div className='relative'>
-                          <Button
-                            variant='ghost'
-                            size='icon'
-                            className='h-7 w-7'
-                            onClick={() =>
-                              setShowEmojiPicker(
-                                showEmojiPicker === message.id
-                                  ? null
-                                  : message.id,
-                              )
-                            }
-                          >
-                            <Smile className='h-3.5 w-3.5' />
-                          </Button>
-                          {showEmojiPicker === message.id && (
-                            <div
-                              className={`absolute top-full mt-2 ${
-                                isCurrentUser ? 'right-0' : 'left-0'
-                              } bg-card border border-border rounded-lg p-2 shadow-lg flex gap-1 z-50`}
-                            >
-                              {QUICK_REACTIONS.map(emoji => (
-                                <button
-                                  key={emoji}
-                                  onClick={() =>
-                                    handleQuickReaction(message.id, emoji)
-                                  }
-                                  className='text-xl hover:scale-125 transition-transform hover:bg-accent p-1 rounded'
-                                >
-                                  {emoji}
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                        <MessageReplyButton
-                          onReply={() => handleReplyClick(message)}
-                        />
-                        <MessageContextMenu
-                          message={message}
-                          currentUser={currentUser}
-                          onEdit={handleEditMessage}
-                          onDelete={handleDeleteMessage}
-                          isEditing={isEditing}
-                        />
                       </div>
                     )}
 
                     <div
-                      className={`flex gap-2 text-xs text-muted-foreground ${
-                        isCurrentUser ? 'flex-row-reverse' : ''
-                      }`}
+                      className={`flex flex-col ${
+                        isCurrentUser ? 'items-end' : 'items-start'
+                      } max-w-xs lg:max-w-md gap-1`}
                     >
-                      <span>
-                        {new Date(message.createdAt).toLocaleTimeString([], {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </span>
-                      {message.isEdited && <span>(edited)</span>}
+                      {showAvatar && !isCurrentUser && (
+                        <div className='flex items-center gap-2 px-3 mb-0.5'>
+                          <span className='text-xs font-medium text-muted-foreground'>
+                            {message.sender.name}
+                          </span>
+                          {message.isPinned && (
+                            <Pin className='h-3 w-3 text-muted-foreground' />
+                          )}
+                        </div>
+                      )}
+
+                      {isEditing ? (
+                        <MessageEditInput
+                          messageId={message.id}
+                          conversationId={conversationId}
+                          initialContent={message.content}
+                          onSave={handleSaveEdit}
+                          onCancel={() => setEditingMessageId(null)}
+                        />
+                      ) : (
+                        <div
+                          className={`rounded-2xl px-4 py-2.5 ${
+                            isCurrentUser
+                              ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-md hover:shadow-lg'
+                              : 'bg-slate-100 dark:bg-slate-800 text-foreground shadow-sm hover:shadow-md'
+                          } transition-all ${
+                            isDeleted ? 'italic opacity-60' : ''
+                          }`}
+                        >
+                          {message.quotedMessage && !isDeleted && (
+                            <QuotedMessageDisplay
+                              quotedMessage={message.quotedMessage}
+                            />
+                          )}
+
+                          {hasFile && !isDeleted && (
+                            <div className='mb-2'>
+                              {message.fileType?.startsWith('image/') ? (
+                                <img
+                                  src={message.fileUrl || ''}
+                                  alt={message.fileName || ''}
+                                  className='max-w-full max-h-64 rounded-lg mb-2'
+                                />
+                              ) : (
+                                <div className='flex items-center gap-2 p-2 bg-white/10 dark:bg-black/20 rounded-lg mb-2'>
+                                  <FileIcon className='h-5 w-5 flex-shrink-0' />
+                                  <span className='text-sm flex-1 truncate'>
+                                    {message.fileName}
+                                  </span>
+                                  <Button
+                                    variant='ghost'
+                                    size='icon'
+                                    className='h-6 w-6 p-0'
+                                  >
+                                    <Download className='h-3 w-3' />
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          <p className='text-sm leading-relaxed break-words'>
+                            {message.content}
+                          </p>
+                        </div>
+                      )}
+
+                      {!isDeleted && (
+                        <MessageReactions
+                          messageId={message.id}
+                          conversationId={conversationId}
+                          reactions={message.reactions || {}}
+                          onReactionAdded={updatedReactions => {
+                            setMessages(prev =>
+                              prev.map(m =>
+                                m.id === message.id
+                                  ? { ...m, reactions: updatedReactions }
+                                  : m,
+                              ),
+                            );
+                          }}
+                        />
+                      )}
+
+                      {!isDeleted && (
+                        <div
+                          className={`flex gap-1 items-center mt-1.5 ${
+                            isCurrentUser ? 'justify-end' : 'justify-start'
+                          }`}
+                        >
+                          <div className='relative'>
+                            <Button
+                              variant='ghost'
+                              size='icon'
+                              className='h-7 w-7'
+                              onClick={() =>
+                                setShowEmojiPicker(
+                                  showEmojiPicker === message.id
+                                    ? null
+                                    : message.id,
+                                )
+                              }
+                            >
+                              <Smile className='h-3.5 w-3.5' />
+                            </Button>
+                            {showEmojiPicker === message.id && (
+                              <div
+                                className={`absolute top-full mt-2 ${
+                                  isCurrentUser ? 'right-0' : 'left-0'
+                                } bg-card border border-border rounded-lg p-2 shadow-lg flex gap-1 z-50`}
+                              >
+                                {QUICK_REACTIONS.map(emoji => (
+                                  <button
+                                    key={emoji}
+                                    onClick={() =>
+                                      handleQuickReaction(message.id, emoji)
+                                    }
+                                    className='text-xl hover:scale-125 transition-transform hover:bg-accent p-1 rounded'
+                                  >
+                                    {emoji}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          <MessageReplyButton
+                            onReply={() => handleReplyClick(message)}
+                          />
+                          <MessageContextMenu
+                            message={message}
+                            currentUser={currentUser}
+                            onEdit={handleEditMessage}
+                            onDelete={handleDeleteMessage}
+                            onPinToggle={handlePinToggle}
+                            isEditing={isEditing}
+                          />
+                        </div>
+                      )}
+
+                      <div
+                        className={`flex gap-2 text-xs text-muted-foreground ${
+                          isCurrentUser ? 'flex-row-reverse' : ''
+                        }`}
+                      >
+                        <span>
+                          {new Date(message.createdAt).toLocaleTimeString([], {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </span>
+                        {message.isEdited && <span>(edited)</span>}
+                        {message.isPinned && (
+                          <span className='flex items-center gap-1'>
+                            <Pin className='h-3 w-3' />
+                            Pinned
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })
+                );
+              })
           )}
         </div>
       </ScrollArea>

@@ -33,6 +33,8 @@ export interface Message {
   isEdited: boolean;
   editedAt?: Date | null;
   deletedAt?: Date | null;
+  isPinned: boolean;
+  pinnedAt?: Date | null;
   reactions?: Record<string, ReactionData>;
   quotedMessage?: QuotedMessage | null;
   quotedMessageId?: string | null;
