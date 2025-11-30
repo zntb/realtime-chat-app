@@ -24,10 +24,13 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid status' }, { status: 400 });
     }
 
-    // Update user status in database
+    // Update user status in database and automatically update lastActive
     const updatedUser = await prisma.user.update({
       where: { id: session.user.id },
-      data: { status },
+      data: {
+        status,
+        lastActive: new Date(), // Update last active timestamp
+      },
       select: {
         id: true,
         status: true,

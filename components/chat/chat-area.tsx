@@ -50,11 +50,13 @@ export function ChatArea({ conversationId, currentUser }: ChatAreaProps) {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState<string | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [otherUserStatus, setOtherUserStatus] = useState<
     'online' | 'offline' | 'away'
   >('offline');
   const scrollRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const awayTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const ws = useWebSocket(currentUser.id);
@@ -146,6 +148,7 @@ export function ChatArea({ conversationId, currentUser }: ChatAreaProps) {
     return () => {
       unsubscribePresence?.();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId, currentUser.id]); // Remove ws and updateUserStatus from dependencies
 
   // Convert presence status to user status
@@ -246,6 +249,7 @@ export function ChatArea({ conversationId, currentUser }: ChatAreaProps) {
       // Update status to offline when component unmounts
       updateUserDatabaseStatus('offline');
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId]); // Remove ws from dependencies to prevent infinite loop
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {

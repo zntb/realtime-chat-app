@@ -16,6 +16,7 @@ import {
 import { ThemeToggle } from '@/components/theme-toggle';
 import { signOut } from '@/lib/auth-client';
 import { useRouter } from 'next/navigation';
+import { formatTimeAgo } from '@/lib/utils';
 import type { Conversation, User } from '@/types/chat';
 import { NewConversationDialog } from './new-conversation-dialog';
 import { ProfileDialog } from '@/components/profile/profile-dialog';
@@ -82,6 +83,17 @@ export function ConversationSidebar({
   const getLastMessage = (conversation: Conversation) => {
     const lastMessage = conversation.messages[conversation.messages.length - 1];
     return lastMessage?.content || 'No messages yet';
+  };
+
+  const getOtherParticipant = (conversation: Conversation) => {
+    if (conversation.isGroup) return null;
+    return conversation.participants.find(p => p.userId !== currentUser.id);
+  };
+
+  const getLastActiveText = (conversation: Conversation) => {
+    const otherParticipant = getOtherParticipant(conversation);
+    if (!otherParticipant || !otherParticipant.user.lastActive) return null;
+    return `Last active ${formatTimeAgo(otherParticipant.user.lastActive)}`;
   };
 
   const filteredConversations = conversations.filter(conv =>
@@ -216,6 +228,11 @@ export function ConversationSidebar({
                   <p className='text-sm text-muted-foreground truncate'>
                     {getLastMessage(conversation)}
                   </p>
+                  {getLastActiveText(conversation) && (
+                    <p className='text-xs text-muted-foreground truncate mt-0.5'>
+                      {getLastActiveText(conversation)}
+                    </p>
+                  )}
                 </div>
               </button>
             ))

@@ -20,8 +20,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Loader2, User, Camera } from 'lucide-react';
+import { Loader2, User, Camera, Clock } from 'lucide-react';
 import { useSession } from '@/lib/auth-client';
+import { formatTimeAgo } from '@/lib/utils';
 
 interface UserProfile {
   id: string;
@@ -30,6 +31,7 @@ interface UserProfile {
   image: string | null;
   bio: string | null;
   status: 'ONLINE' | 'OFFLINE' | 'AWAY' | 'BUSY' | 'DO_NOT_DISTURB';
+  lastActive?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -245,6 +247,16 @@ export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
                   Current: {getStatusInfo(formData.status).label}
                 </span>
               </div>
+
+              {/* Last Active Display */}
+              {profile.lastActive && (
+                <div className='flex items-center gap-2 p-3 rounded-lg bg-muted/50'>
+                  <Clock className='w-4 h-4 text-muted-foreground' />
+                  <span className='text-sm text-muted-foreground'>
+                    Last active {formatTimeAgo(profile.lastActive)}
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Save Button */}
