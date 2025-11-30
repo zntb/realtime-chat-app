@@ -30,7 +30,6 @@ export function createWebSocketServer(port = 3001) {
     console.log('[ChatFlow] Ready for connections on ws://localhost:' + port);
   });
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   wss.on('connection', (ws: WebSocketClient, req: IncomingMessage) => {
     console.log('[ChatFlow] New WebSocket connection established');
     console.log('[ChatFlow] Connection from:', req.socket.remoteAddress);
